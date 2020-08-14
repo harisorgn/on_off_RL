@@ -91,6 +91,48 @@ function RW_update!(r1, r2, r1_exp, r2_exp, n, beta, decay, rng, b1 = 0.0, b2 = 
 	return (r1_updated, r2_updated, action, r, dr)
 end
 
+function advantage_RW_update!(r1, r2, r1_exp, r2_exp, r_state, n_exp, n_state, beta, decay, rng, b1 = 0.0, b2 = 0.0)
+
+	r = 0.0
+	dr = 0.0
+	action = 0
+
+	r1_updated = 0.0
+	r2_updated = 0.0
+
+	p_r1 = softmax_p(beta, r1_exp - r_state, r2_exp - r_state, b1, b2)
+
+	if p_r1 > rand(rng)
+
+		r = r1
+
+		r1_updated = r1_exp + n_exp * (r1 - r1_exp)
+		
+		r2_updated = (1.0 - decay) * r2_exp
+
+		action = 1
+
+		dr = r1 - r1_exp - b1
+
+	else
+		
+		r = r2
+
+		r2_updated = r2_exp + n_exp * (r2 - r2_exp)
+		
+		r1_updated = (1.0 - decay) * r1_exp
+
+		action = 2
+
+		dr = r2 - r2_exp - b2
+
+	end
+
+	r_state += n_state * (r - r_state)
+
+	return (r1_updated, r2_updated, r_state, action, r, dr)
+end
+
 function prob_RW_update!(r1, r2, r1_exp, r2_exp, n, m, s, beta, decay, rng, b1 = 0.0, b2 = 0.0)
 
 	r = 0.0
