@@ -38,15 +38,12 @@ function run()
 	beta = 2.5		
 	decay = 0.01
 
-	off_capacity = 5
-	n_off_samples = 5	
+	off_capacity = 4
+	n_off_samples = 8	
 	n_b = 0.1			
 
 	n_sessions = 2
 	n_trials = 20
-
-	n_test_sessions = 1
-	n_test_trials = 10
 
 	r1_RW_m = zeros(n_trials, n_sessions)
 	r2_RW_m = zeros(n_trials, n_sessions)
@@ -58,15 +55,15 @@ function run()
 	r01_prob_RW_m = zeros(n_trials, n_sessions)
 	r02_prob_RW_m = zeros(n_trials, n_sessions)
 
-	choice_RW_m = Matrix{Int64}(undef, n_trials, n_sessions)
-	choice_prob_RW_m = Matrix{Int64}(undef, n_trials, n_sessions)
+	action_RW_m = Matrix{Int64}(undef, n_trials, n_sessions)
+	action_prob_RW_m = Matrix{Int64}(undef, n_trials, n_sessions)
 
 	off_surprise_RW_m = zeros(off_capacity, n_sessions)
-	off_choice_RW_m = Matrix{Int64}(undef, off_capacity, n_sessions)
+	off_action_RW_m = Matrix{Int64}(undef, off_capacity, n_sessions)
 	off_dr_RW_m = Matrix{Float64}(undef, off_capacity, n_sessions)
 
 	off_surprise_prob_RW_m = zeros(off_capacity, n_sessions)
-	off_choice_prob_RW_m = Matrix{Int64}(undef, off_capacity, n_sessions)
+	off_action_prob_RW_m = Matrix{Int64}(undef, off_capacity, n_sessions)
 	off_dr_prob_RW_m = Matrix{Float64}(undef, off_capacity, n_sessions)
 
 	b1_RW_m = zeros(n_off_samples + 1, n_sessions)
@@ -89,11 +86,11 @@ function run()
 		#-----------
 
 		off_surprise_RW_v = zeros(off_capacity)
-		off_choice_RW_v = zeros(Int, off_capacity)
+		off_action_RW_v = zeros(Int, off_capacity)
 		off_dr_RW_v = zeros(off_capacity)
 
 		off_surprise_prob_RW_v = zeros(off_capacity)
-		off_choice_prob_RW_v = zeros(Int, off_capacity)
+		off_action_prob_RW_v = zeros(Int, off_capacity)
 		off_dr_prob_RW_v = zeros(off_capacity)
 
 		if i > 1
@@ -128,14 +125,14 @@ function run()
 			r0 = rand(rng, d_r0)
 
 			(r1_RW_m[j, i], r01_RW_m[j,i], 
-			choice_RW_m[j - 1, i], r_trial_RW, dr_RW) = RW_update!(r1, r0, 
+			action_RW_m[j - 1, i], r_trial_RW, dr_RW) = RW_update!(r1, r0, 
 																r1_RW_m[j - 1, i], r01_RW_m[j - 1, i], 
 																n_RW, beta, decay, rng, 
 																b1_RW, b0_RW)
 
 			accum_r_RW_v[i] += r_trial_RW
 
-			(r1_prob_RW_m[j, i], r01_prob_RW_m[j,i], choice_prob_RW_m[j - 1, i], 
+			(r1_prob_RW_m[j, i], r01_prob_RW_m[j,i], action_prob_RW_m[j - 1, i], 
 			r_trial_prob_RW, dr_prob_RW, surprise_prob_RW) = prob_RW_update!(r1, r0, 
 																			r1_prob_RW_m[j - 1, i], 
 																			r01_prob_RW_m[j - 1, i], 
@@ -145,33 +142,33 @@ function run()
 
 			accum_r_prob_RW_v[i] += r_trial_prob_RW
 
-			off_buffer_update!(off_surprise_RW_v, off_choice_RW_v, off_dr_RW_v,
-							abs(dr_RW), choice_RW_m[j - 1, i], dr_RW)
+			off_buffer_update!(off_surprise_RW_v, off_action_RW_v, off_dr_RW_v,
+							abs(dr_RW), action_RW_m[j - 1, i], dr_RW)
 
-			off_buffer_update!(off_surprise_prob_RW_v, off_choice_prob_RW_v, off_dr_prob_RW_v,
-						surprise_prob_RW, choice_prob_RW_m[j - 1, i], dr_prob_RW)
+			off_buffer_update!(off_surprise_prob_RW_v, off_action_prob_RW_v, off_dr_prob_RW_v,
+						surprise_prob_RW, action_prob_RW_m[j - 1, i], dr_prob_RW)
    
 		end
 
-		off_value_update!(off_surprise_RW_v, off_choice_RW_v, sum(off_dr_RW_v), 
-						b1_RW_m, b01_RW_m, n_b, n_off_samples, rng, i)
+		off_value_update!(off_surprise_RW_v, off_action_RW_v, sum(off_dr_RW_v), 
+						b1_RW_m, b01_RW_m, n_b, decay, n_off_samples, rng, i)
 
-		off_value_update!(off_surprise_prob_RW_v, off_choice_prob_RW_v, sum(off_dr_prob_RW_v), 
-						b1_prob_RW_m, b01_prob_RW_m, n_b, n_off_samples, rng, i)
+		off_value_update!(off_surprise_prob_RW_v, off_action_prob_RW_v, sum(off_dr_prob_RW_v), 
+						b1_prob_RW_m, b01_prob_RW_m, n_b, decay, n_off_samples, rng, i)
 
 		println("Preference of substrate 1 over 0 : ", 
-				100.0 * count(x -> x == 1, choice_prob_RW_m[:, i]) / n_trials)
+				100.0 * count(x -> x == 1, action_prob_RW_m[:, i]) / n_trials)
 
 		#-----------
 		# r2 VS r0
 		#-----------
 
 		off_surprise_RW_v = zeros(off_capacity)
-		off_choice_RW_v = zeros(Int, off_capacity)
+		off_action_RW_v = zeros(Int, off_capacity)
 		off_dr_RW_v = zeros(off_capacity)
 
 		off_surprise_prob_RW_v = zeros(off_capacity)
-		off_choice_prob_RW_v = zeros(Int, off_capacity)
+		off_action_prob_RW_v = zeros(Int, off_capacity)
 		off_dr_prob_RW_v = zeros(off_capacity)
 
 		r02_RW_m[1, i] = r01_RW_m[end, i]
@@ -189,14 +186,14 @@ function run()
 			r0 = rand(rng, d_r0)
 
 			(r2_RW_m[j, i], r02_RW_m[j,i], 
-			choice_RW_m[j - 1, i], r_trial_RW, dr_RW) = RW_update!(r2, r0, 
+			action_RW_m[j - 1, i], r_trial_RW, dr_RW) = RW_update!(r2, r0, 
 																r2_RW_m[j - 1, i], r02_RW_m[j - 1, i], 
 																n_RW, beta, decay, rng, 
 																b2_RW, b0_RW)
 
 			accum_r_RW_v[i] += r_trial_RW
 
-			(r2_prob_RW_m[j, i], r02_prob_RW_m[j,i], choice_prob_RW_m[j - 1, i], 
+			(r2_prob_RW_m[j, i], r02_prob_RW_m[j,i], action_prob_RW_m[j - 1, i], 
 			r_trial_prob_RW, dr_prob_RW, surprise_prob_RW) = prob_RW_update!(r2, r0, 
 																			r2_prob_RW_m[j - 1, i], 
 																			r02_prob_RW_m[j - 1, i], 
@@ -206,22 +203,22 @@ function run()
 
 			accum_r_prob_RW_v[i] += r_trial_prob_RW
 
-			off_buffer_update!(off_surprise_RW_v, off_choice_RW_v, off_dr_RW_v,
-							abs(dr_RW), choice_RW_m[j - 1, i], dr_RW)
+			off_buffer_update!(off_surprise_RW_v, off_action_RW_v, off_dr_RW_v,
+							abs(dr_RW), action_RW_m[j - 1, i], dr_RW)
 
-			off_buffer_update!(off_surprise_prob_RW_v, off_choice_prob_RW_v, off_dr_prob_RW_v,
-						surprise_prob_RW, choice_prob_RW_m[j - 1, i], dr_prob_RW)
+			off_buffer_update!(off_surprise_prob_RW_v, off_action_prob_RW_v, off_dr_prob_RW_v,
+						surprise_prob_RW, action_prob_RW_m[j - 1, i], dr_prob_RW)
    
 		end
 
-		off_value_update!(off_surprise_RW_v, off_choice_RW_v, sum(off_dr_RW_v) + dr_offset, 
+		off_value_update!(off_surprise_RW_v, off_action_RW_v, sum(off_dr_RW_v) + dr_offset, 
 						b2_RW_m, b02_RW_m, n_b, decay, n_off_samples, rng, i)
 
-		off_value_update!(off_surprise_prob_RW_v, off_choice_prob_RW_v, sum(off_dr_prob_RW_v) + dr_offset, 
+		off_value_update!(off_surprise_prob_RW_v, off_action_prob_RW_v, sum(off_dr_prob_RW_v) + dr_offset, 
 						b2_prob_RW_m, b02_prob_RW_m, n_b, decay, n_off_samples, rng, i)
 
 		println("Preference of substrate 2 over 0 : ", 
-				100.0 * count(x -> x == 1, choice_prob_RW_m[:, i]) / n_trials)
+				100.0 * count(x -> x == 1, action_prob_RW_m[:, i]) / n_trials)
 	end
 
 	println("P(r2 over r1) = ", 1.0 - softmax_p(beta, r1_prob_RW_m[end, end], r2_prob_RW_m[end, end], 

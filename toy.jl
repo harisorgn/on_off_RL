@@ -20,14 +20,25 @@ function run()
 	s_out1 = 0.1
 	w_out1 = 0.05
 
-	m_out2 = -10.0 
-	s_out2 = 0.1
+	m_out2 = - m_out1
+	s_out2 = s_out1
 	w_out2 = w_out1
 
 	out_d = MixtureModel(Normal, [(m_out0, s_out0), (m_out1, s_out1), (m_out2, s_out2)], 
 								 [1.0 - w_out1 - w_out2, w_out1, w_out2])
 
-	w_asym = 0.3
+	#=
+	out1_d = MixtureModel(Normal, [(m_out0, s_out0), (m_out1, s_out1), (m_out2, s_out2)], 
+								 [1.0 - 0.2 - 0.05, 0.2, 0.05])
+
+	out2_d = MixtureModel(Normal, [(m_out0, s_out0), (m_out1, s_out1), (m_out2, s_out2)], 
+								 [1.0 - 0.05 - 0.2, 0.05, 0.2])
+	=#
+
+	out1_d = out_d
+	out2_d = out_d
+
+	w_asym = 0.1
 
 	asym_r_d = MixtureModel(Normal, [(0.0, 0.0), (5.0, 0.1)], [1.0 - w_asym, w_asym])
 
@@ -36,15 +47,15 @@ function run()
     gamma_d = 0.01	# reversion rate
 
 	# Reward statistics and mean-reverting coefficient for OU process
-	m_r1 = 0.0 
+	m_r1 = 1.0 
 	s_r1 = 0.5
 	revert_coeff_r1 = gamma_d
 		
-	m_r2 = 0.0 
+	m_r2 = 1.0 
 	s_r2 = 0.5
 	revert_coeff_r2 = gamma_d
 
-    # work out OU statistics:
+    # work out OU statistics :
     n_OU_test = 1000 
 
     x1 = m_r1
@@ -56,10 +67,10 @@ function run()
     for k in 1 : n_OU_test
 
         x1 += OU_step(x1, m_r1, s_r1, revert_coeff_r1, rand(rng, wiener_d)) 
-        x1_out[k] = x1 + rand(rng, out_d) #+ rand(rng, asym_r_d)
+        x1_out[k] = x1 + rand(rng, out1_d) #+ rand(rng, asym_r_d)
 
         x2 += OU_step(x2, m_r2, s_r2, revert_coeff_r2, rand(rng, wiener_d)) 
-        x2_out[k] = x2 + rand(rng, out_d)
+        x2_out[k] = x2 + rand(rng, out2_d)
 
     end
     
@@ -85,10 +96,10 @@ function run()
     s_observe_KF = 0.5
 
 	beta = 2.5			# softmax β	
-	decay = gamma_d		# value decay when not chosen
+	decay = 0.1			# value decay when not chosen
 
 	n_sessions = 100	# sessions 
-	n_trials = 20		# trials per session
+	n_trials = 50		# trials per session
 	
 	# Offline bias calculations
 	off_capacity = 10	# trials to be saved for offline calculations
@@ -137,11 +148,11 @@ function run()
 	s_r1_KF_m[1, 1] = s_KF 
 	s_r2_KF_m[1, 1] = s_KF 
 
-	# Choices for each rule
-	choice_RW_m = Matrix{Int64}(undef, n_trials, n_sessions)
-	choice_stoch_RW_m = Matrix{Int64}(undef, n_trials, n_sessions)
-	choice_prob_RW_m = Matrix{Int64}(undef, n_trials, n_sessions)
-	choice_KF_m = Matrix{Int64}(undef, n_trials, n_sessions)
+	# actions for each rule
+	action_RW_m = Matrix{Int64}(undef, n_trials, n_sessions)
+	action_stoch_RW_m = Matrix{Int64}(undef, n_trials, n_sessions)
+	action_prob_RW_m = Matrix{Int64}(undef, n_trials, n_sessions)
+	action_KF_m = Matrix{Int64}(undef, n_trials, n_sessions)
 
 	# Biases updated offline
 	b1_RW_m = zeros(n_off_samples + 1, n_sessions)
@@ -156,18 +167,18 @@ function run()
 
 	# Initialise values for session
 	r1_m[1, j] = rand(rng, Normal(m_r1, s_r1))
-	r1_out_m[1, j] = r1_m[1, j] + rand(rng, out_d) + asym_r
+	r1_out_m[1, j] = r1_m[1, j] + rand(rng, out1_d) + asym_r
 
 	r2_m[1, j] = rand(rng, Normal(m_r2, s_r2))
-	r2_out_m[1, j] = r2_m[1, j] + rand(rng, out_d)
+	r2_out_m[1, j] = r2_m[1, j] + rand(rng, out2_d)
 
 	# Buffers for offline calculations
 	off_surprise_RW_v = zeros(off_capacity)
-	off_choice_RW_v = zeros(Int, off_capacity)
+	off_action_RW_v = zeros(Int, off_capacity)
 	off_dr_RW_v = zeros(off_capacity)
 
 	off_surprise_prob_RW_v = zeros(off_capacity)
-	off_choice_prob_RW_v = zeros(Int, off_capacity)
+	off_action_prob_RW_v = zeros(Int, off_capacity)
 	off_dr_prob_RW_v = zeros(off_capacity)
 
 	if j > 1
@@ -186,11 +197,11 @@ function run()
 		# biases update offline : 
 		#-----------------------------------------------------
 		
-		r1_RW_m[1, j] = r1_RW_m[end, j - 1] * decay
-		r2_RW_m[1, j] = r2_RW_m[end, j - 1] * decay
+		r1_RW_m[1, j] = r1_RW_m[end, j - 1] * (1.0 - decay)
+		r2_RW_m[1, j] = r2_RW_m[end, j - 1] * (1.0 - decay)
 
-		r1_prob_RW_m[1, j] = r1_prob_RW_m[end, j - 1] * decay
-		r2_prob_RW_m[1, j] = r2_prob_RW_m[end, j - 1] * decay
+		r1_prob_RW_m[1, j] = r1_prob_RW_m[end, j - 1] * (1.0 - decay)
+		r2_prob_RW_m[1, j] = r2_prob_RW_m[end, j - 1] * (1.0 - decay)
 
 		b1_RW_m[1, j] = b1_RW_m[end, j - 1]
 		b2_RW_m[1, j] = b2_RW_m[end, j - 1]
@@ -200,11 +211,11 @@ function run()
 		
 		#-----------------------------------------------------
 
-		r1_stoch_RW_m[1, j] = r1_stoch_RW_m[end, j - 1] * decay
-		r2_stoch_RW_m[1, j] = r2_stoch_RW_m[end, j - 1] * decay
+		r1_stoch_RW_m[1, j] = r1_stoch_RW_m[end, j - 1] * (1.0 - decay)
+		r2_stoch_RW_m[1, j] = r2_stoch_RW_m[end, j - 1] * (1.0 - decay)
 
-		r1_KF_m[1, j] = r1_KF_m[end, j - 1] * decay
-		r2_KF_m[1, j] = r2_KF_m[end, j - 1] * decay
+		r1_KF_m[1, j] = r1_KF_m[end, j - 1] * (1.0 - decay)
+		r2_KF_m[1, j] = r2_KF_m[end, j - 1] * (1.0 - decay)
 
 		s_r1_KF_m[1, j] = s_r1_KF_m[end, j - 1]
 		s_r2_KF_m[1, j] = s_r2_KF_m[end, j - 1] 
@@ -221,15 +232,15 @@ function run()
 
 		p_r1_ideal = softmax_p(beta, r1_m[i - 1, j] + asym_r, r2_m[i - 1, j])
 
-		# Resolve choices, accumulate reward and update expected reward for each rule
+		# Resolve actions, accumulate reward and update expected reward for each rule
 
-        rand() > 0.5 ? accum_random[j] += r1_out_m[i - 1, j] : accum_random[j] += r2_out_m[i - 1, j]
+        rand(rng) > 0.5 ? accum_random[j] += r1_out_m[i - 1, j] : accum_random[j] += r2_out_m[i - 1, j]
 
 
         p_r1_ideal > rand(rng) ? accum_ideal[j] += r1_out_m[i - 1, j] : accum_ideal[j] += r2_out_m[i - 1, j]
         
 
-        (r1_RW_m[i, j], r2_RW_m[i, j], choice_RW_m[i - 1, j], r_trial_RW, dr_RW) = RW_update!(r1_out_m[i - 1, j], 
+        (r1_RW_m[i, j], r2_RW_m[i, j], action_RW_m[i - 1, j], r_trial_RW, dr_RW) = RW_update!(r1_out_m[i - 1, j], 
         																					r2_out_m[i - 1, j],
         																					r1_RW_m[i - 1, j], 
         																					r2_RW_m[i - 1, j], 
@@ -238,7 +249,7 @@ function run()
 
         accum_r_RW_v[j] += r_trial_RW
 
-    	(r1_prob_RW_m[i, j], r2_prob_RW_m[i, j], choice_prob_RW_m[i - 1, j], 
+    	(r1_prob_RW_m[i, j], r2_prob_RW_m[i, j], action_prob_RW_m[i - 1, j], 
     	r_trial_prob_RW, dr_prob_RW, surprise_prob_RW) = prob_RW_update!(r1_out_m[i - 1, j], 
     																	r2_out_m[i - 1, j],
     																	r1_prob_RW_m[i - 1, j], 
@@ -250,7 +261,7 @@ function run()
     	accum_r_prob_RW_v[j] += r_trial_prob_RW
 
     	(r1_stoch_RW_m[i, j], r2_stoch_RW_m[i, j], 
-    	choice_stoch_RW_m[i - 1, j], r_trial_stoch_RW, dr_stoch_RW) = stoch_RW_update!(r1_out_m[i - 1, j], 
+    	action_stoch_RW_m[i - 1, j], r_trial_stoch_RW, dr_stoch_RW) = stoch_RW_update!(r1_out_m[i - 1, j], 
 																					r2_out_m[i - 1, j],
 																					r1_stoch_RW_m[i - 1, j], 
 																					r2_stoch_RW_m[i - 1, j], 
@@ -259,7 +270,7 @@ function run()
         accum_r_stoch_RW_v[j] += r_trial_stoch_RW
 		
 		(r1_KF_m[i, j], r2_KF_m[i, j], s_r1_KF_m[i, j], s_r2_KF_m[i, j],
-    	choice_KF_m[i - 1, j], r_trial_KF, dr_KF) = KF_update!(r1_out_m[i - 1, j], r2_out_m[i - 1, j],
+    	action_KF_m[i - 1, j], r_trial_KF, dr_KF) = KF_update!(r1_out_m[i - 1, j], r2_out_m[i - 1, j],
 															r1_KF_m[i - 1, j], r2_KF_m[i - 1, j], 
 															s_r1_KF_m[i - 1, j], s_r2_KF_m[i - 1, j], 
 															m_KF, s_KF, revert_coeff_KF, s_observe_KF,
@@ -273,20 +284,20 @@ function run()
 
 		r1_m[i, j] = r1_m[i - 1, j] + OU_step(r1_m[i - 1, j], m_r1, s_r1, revert_coeff_r1, rand(rng, wiener_d))
 
-        r1_out_m[i, j] = r1_m[i, j] + rand(rng, out_d) + asym_r
+        r1_out_m[i, j] = r1_m[i, j] + rand(rng, out1_d) + asym_r
 
 		r2_m[i, j] = r2_m[i - 1, j] + OU_step(r2_m[i - 1, j], m_r2, s_r2, revert_coeff_r2, rand(rng, wiener_d))
 
-		r2_out_m[i, j] = r2_m[i, j] + rand(rng, out_d)
+		r2_out_m[i, j] = r2_m[i, j] + rand(rng, out2_d)
 
         # update buffers for offline calculations
 
-        off_buffer_update!(off_surprise_prob_RW_v, off_choice_prob_RW_v, off_dr_prob_RW_v,
-						surprise_prob_RW, choice_prob_RW_m[i - 1, j], dr_prob_RW)
+        off_buffer_update!(off_surprise_prob_RW_v, off_action_prob_RW_v, off_dr_prob_RW_v,
+						surprise_prob_RW, action_prob_RW_m[i - 1, j], dr_prob_RW)
 
 
-        off_buffer_update!(off_surprise_RW_v, off_choice_RW_v, off_dr_RW_v,
-						abs(dr_RW), choice_RW_m[i - 1, j], dr_RW)
+        off_buffer_update!(off_surprise_RW_v, off_action_RW_v, off_dr_RW_v,
+						abs(dr_RW), action_RW_m[i - 1, j], dr_RW)
 
 	end
 
@@ -303,10 +314,10 @@ function run()
 		=#
 		#----------------------------------------
 
-		off_value_update!(off_surprise_prob_RW_v, off_choice_prob_RW_v, sum(off_dr_prob_RW_v), 
+		off_value_update!(off_surprise_prob_RW_v, off_action_prob_RW_v, sum(off_dr_prob_RW_v), 
 						b1_prob_RW_m, b2_prob_RW_m, n_b, decay, n_off_samples, rng, j)
 
-		off_value_update!(off_surprise_RW_v, off_choice_RW_v, sum(off_dr_RW_v), 
+		off_value_update!(off_surprise_RW_v, off_action_RW_v, sum(off_dr_RW_v), 
 						b1_RW_m, b2_RW_m, n_b, decay, n_off_samples, rng, j)
 	end
 
@@ -362,11 +373,14 @@ function run()
 						r1_m[:,idx], r2_m[:,idx], 
 						r1_RW_m[:,idx], r2_RW_m[:,idx],
 						r1_prob_RW_m[:,idx], r2_prob_RW_m[:,idx],
-						choice_RW_m[:,idx], choice_prob_RW_m[:,idx])
+						action_RW_m[:,idx], action_prob_RW_m[:,idx])
 	=#
 
-	plot_reward_bias(r1_m, r2_m, b1_prob_RW_m, b2_prob_RW_m, 1:n_sessions)
-	plot_reward_bias(r1_m, r2_m, b1_RW_m, b2_RW_m, 1:n_sessions)
+	#plot_reward(r1_out_m, r2_out_m, r1_prob_RW_m, r2_prob_RW_m, n_off_samples, 91:100)
+	#plot_reward(r1_out_m, r2_out_m, r1_RW_m, r2_RW_m, n_off_samples, 91:100)
+
+	plot_reward_bias(r1_out_m, r2_out_m, b1_prob_RW_m, b2_prob_RW_m, 91:100)
+	plot_reward_bias(r1_out_m, r2_out_m, b1_RW_m, b2_RW_m, 91:100)
 end
 
 run()
