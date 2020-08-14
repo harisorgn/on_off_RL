@@ -92,7 +92,7 @@ function RW_update!(r1, r2, r1_exp, r2_exp, n, beta, decay, rng, b1 = 0.0, b2 = 
 end
 
 function advantage_RW_update!(r1, r2, r1_exp, r2_exp, r_state, n_exp, n_state, beta, decay, rng, b1 = 0.0, b2 = 0.0)
-
+	#tstststststsst
 	r = 0.0
 	dr = 0.0
 	action = 0
