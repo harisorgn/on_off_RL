@@ -2,6 +2,9 @@ abstract type abstract_environment end
 abstract type OU_bandit_environment <: abstract_environment end
 
 struct OU_bandit_distribution_outlier_environment <:OU_bandit_environment
+	n_steps::Int64
+	n_actions::Int64
+	n_sessions::Int64
 	γ_v::Array{Float64, 1}
 	μ_v::Array{Float64, 1}
 	σ_v::Array{Float64, 1}
@@ -30,13 +33,16 @@ struct OU_bandit_distribution_outlier_environment <:OU_bandit_environment
 			end
 		end
 
-		new(γ_v, μ_v, σ_v, outlier_distr_v, r_OU_m, r_m, rng)
+		new(n_steps, n_actions, n_sessions, γ_v, μ_v, σ_v, outlier_distr_v, r_OU_m, r_m, rng)
 	end
 end
 
 (env::OU_bandit_distribution_outlier_environment)(action, cstep, session) = env.r_m[cstep, action, session]
 
 struct OU_bandit_frequency_outlier_environment <:OU_bandit_environment
+	n_steps::Int64
+	n_actions::Int64
+	n_sessions::Int64
 	γ_v::Array{Float64, 1}
 	μ_v::Array{Float64, 1}
 	σ_v::Array{Float64, 1}
@@ -70,7 +76,8 @@ struct OU_bandit_frequency_outlier_environment <:OU_bandit_environment
 			end
 		end
 
-		new(γ_v, μ_v, σ_v, r_outlier, p_outlier_max, η_p_outlier, decay_p_outlier, 
+		new(n_steps, n_actions, n_sessions, γ_v, μ_v, σ_v, 
+			r_outlier, p_outlier_max, η_p_outlier, decay_p_outlier, 
 			zeros(n_steps + 1, n_sessions), r_OU_m, r_m, rng)
 	end
 end
@@ -86,7 +93,6 @@ function (env::OU_bandit_frequency_outlier_environment)(action, cstep, session)
 
 	return rand(env.rng) < env.p_outlier_m[cstep + 1, session] ? env.r_m[cstep, session] + env.r_outlier : env.r_m[cstep, session]
 end
-
 
 function run_environment!(env::OU_bandit_environment, agent::abstract_bandit_agent)
 

@@ -241,23 +241,6 @@ end
 #----------------------------------------------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------------------------------------------
 
-struct random_agent <: abstract_bandit_agent
-	r_m::Array{Float64}
-	accumulated_r_v::Array{Float64, 1}
-	policy::abstract_policy
-	bias::offline_bias
-
-	random_agent(n_steps, n_actions, n_sessions, bias) = new(zeros(n_steps, n_actions, n_sessions), zeros(n_sessions), 
-														ε_greedy_policy(1.0), bias)
-end
-
-function (agent::random_agent)(r_environment, cstep, session)
-
-	agent.accumulated_r_v[session] += r_environment
-
-	return agent.policy(1:agent.n_actions)
-end
-
 struct optimal_bandit_distribution_outlier_agent <: abstract_optimal_bandit_agent
 	action_m::Array{Int64}
 	accumulated_r_v::Array{Float64, 1}
