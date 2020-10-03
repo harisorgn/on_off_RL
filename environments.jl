@@ -1,47 +1,54 @@
 abstract type abstract_environment end
-abstract type OU_bandit_environment <: abstract_environment end
+abstract type abstract_bandit_environment <: abstract_environment end
 
-struct OU_bandit_distribution_outlier_environment <:OU_bandit_environment
+struct OU_bandit_distribution_outlier_environment <:abstract_bandit_environment
 	n_steps::Int64
-	n_actions::Int64
+	n_bandits::Int64
 	n_sessions::Int64
 	γ_v::Array{Float64, 1}
 	μ_v::Array{Float64, 1}
 	σ_v::Array{Float64, 1}
 	outlier_distr_v::Array{Distribution, 1}
-	r_OU_m::Array{Float64}				# steps x actions x sessions
-	r_m::Array{Float64}					# steps x actions x sessions
+	r_m::Array{Float64}						# steps x bandits x sessions
+	r_outlier_m::Array{Float64}				# steps x bandits x sessions
 	rng::AbstractRNG
 
-	function OU_bandit_distribution_outlier_environment(n_steps, n_sessions, γ_v, μ_v, σ_v, outlier_distr_v)
+	function OU_bandit_distribution_outlier_environment(n_steps, n_sessions, r_0_v, γ_v, μ_v, σ_v, outlier_distr_v)
 
 		rng = MersenneTwister()
 
-		n_actions = length(μ_v)
+		n_bandits = length(μ_v)
 
-		r_OU_m = zeros(n_steps, n_actions, n_sessions)
-		r_m = zeros(n_steps, n_actions, n_sessions)
+		r_m = zeros(n_steps, n_bandits, n_sessions)
+		r_outlier_m = zeros(n_steps, n_bandits, n_sessions)
 
-		for i = 1 : n_sessions
-			for j = 2 : n_steps
+		for session = 1 : n_sessions
 
-				r_OU_m[j, :, i] = r_OU_m[j - 1, :, i] .+ γ_v .* (μ_v .- r_OU_m[j - 1, :, i]) .+ 
-								σ_v .* rand(rng, Normal(0, 1), n_actions)
+			r_m[1, :, session] = r_0_v
 
-				r_m[j, :, i] = r_OU_m[j, :, i] .+ [rand(rng, outlier_distr) for outlier_distr in outlier_distr_v]
+			r_outlier_m[1, :, session] = [rand(rng, outlier_distr) for outlier_distr in outlier_distr_v]
+
+			for cstep = 2 : n_steps
+
+				r_m[cstep, :, session] = r_m[cstep - 1, :, session] .+ γ_v .* (μ_v .- r_m[cstep - 1, :, session]) .+ 
+										σ_v .* rand(rng, Normal(0, 1), n_bandits)
+
+				r_outlier_m[cstep, :, session] = [rand(rng, outlier_distr) for outlier_distr in outlier_distr_v]
 
 			end
 		end
 
-		new(n_steps, n_actions, n_sessions, γ_v, μ_v, σ_v, outlier_distr_v, r_OU_m, r_m, rng)
+
+		new(n_steps, n_bandits, n_sessions, γ_v, μ_v, σ_v, outlier_distr_v, r_m, r_outlier_m, rng)
 	end
 end
 
-(env::OU_bandit_distribution_outlier_environment)(action, cstep, session) = env.r_m[cstep, action, session]
+(env::OU_bandit_distribution_outlier_environment)(action, cstep, session) = env.r_m[cstep, action, session] + 
+																			env.r_outlier_m[cstep, action, session]
 
-struct OU_bandit_frequency_outlier_environment <:OU_bandit_environment
+struct OU_bandit_frequency_outlier_environment <:abstract_bandit_environment
 	n_steps::Int64
-	n_actions::Int64
+	n_bandits::Int64
 	n_sessions::Int64
 	γ_v::Array{Float64, 1}
 	μ_v::Array{Float64, 1}
@@ -50,35 +57,35 @@ struct OU_bandit_frequency_outlier_environment <:OU_bandit_environment
 	p_outlier_max::Float64
 	η_p_outlier::Float64
 	decay_p_outlier::Float64
-	p_outlier_m::Array{Float64}
-	r_OU_m::Array{Float64}				# steps x actions x sessions
-	r_m::Array{Float64}					# steps x actions x sessions
+	p_outlier_m::Array{Float64}			# steps x sessions
+	r_m::Array{Float64}					# steps x bandits x sessions
+	r_outlier_m::Array{Float64}			# steps x bandits x sessions
 	rng::AbstractRNG
 
-	function OU_bandit_frequency_outlier_environment(n_steps, n_sessions, γ_v, μ_v, σ_v, 
+	function OU_bandit_frequency_outlier_environment(n_steps, n_sessions, r_0_v, γ_v, μ_v, σ_v, 
 													r_outlier, p_outlier_max, η_p_outlier, decay_p_outlier)
 
 		rng = MersenneTwister()
 
-		n_actions = length(μ_v)
+		n_bandits = length(μ_v)
 
-		r_OU_m = zeros(n_steps, n_actions, n_sessions)
-		r_m = zeros(n_steps, n_actions, n_sessions)
+		r_m = zeros(n_steps, n_bandits, n_sessions)
 
-		for i = 1 : n_sessions
-			for j = 2 : n_steps
+		for session = 1 : n_sessions
 
-				r_OU_m[j, :, i] = r_OU_m[j - 1, :, i] .+ γ_v .* (μ_v .- r_OU_m[j - 1, :, i]) .+ 
-								σ_v .* rand(rng, Normal(0, 1), n_actions)
+			r_m[1, :, session] = r_0_v
 
-				r_m[j, :, i] = r_OU_m[j, :, i]
+			for cstep = 2 : n_steps
+
+				r_m[cstep, :, session] = r_m[cstep - 1, :, session] .+ γ_v .* (μ_v .- r_m[cstep - 1, :, session]) .+ 
+										σ_v .* rand(rng, Normal(0, 1), n_bandits)
 
 			end
 		end
 
-		new(n_steps, n_actions, n_sessions, γ_v, μ_v, σ_v, 
-			r_outlier, p_outlier_max, η_p_outlier, decay_p_outlier, 
-			zeros(n_steps + 1, n_sessions), r_OU_m, r_m, rng)
+		new(n_steps, n_bandits, n_sessions, γ_v, μ_v, σ_v, 
+			r_outlier, p_outlier_max, η_p_outlier, decay_p_outlier, zeros(n_steps + 1, n_sessions), 
+			r_m, zeros(n_steps, n_bandits, n_sessions), rng)
 	end
 end
 
@@ -91,22 +98,89 @@ function (env::OU_bandit_frequency_outlier_environment)(action, cstep, session)
 		env.p_outlier_m[cstep + 1, session] = (1.0 - env.decay_p_outlier) * env.p_outlier_m[cstep, session]
 	end
 
-	return rand(env.rng) < env.p_outlier_m[cstep + 1, session] ? env.r_m[cstep, session] + env.r_outlier : env.r_m[cstep, session]
+	if rand(env.rng) < env.p_outlier_m[cstep + 1, session]
+
+		env.r_outlier_m[cstep, :, session] .= env.r_outlier 
+
+	end
+
+	return env.r_m[cstep, action, session] + env.r_outlier_m[cstep, action, session]
 end
 
-function run_environment!(env::OU_bandit_environment, agent::abstract_bandit_agent)
+struct OU_bandit_delay_outlier_environment <:abstract_bandit_environment
+	n_steps::Int64
+	n_bandits::Int64
+	n_sessions::Int64
+	γ_v::Array{Float64, 1}
+	μ_v::Array{Float64, 1}
+	σ_v::Array{Float64, 1}
+	r_outlier::Float64
+	outlier_delay_distr::Distribution
+	r_m::Array{Float64}					# steps x bandits x sessions
+	r_outlier_m::Array{Float64}			# steps x bandits x sessions
+	rng::AbstractRNG
 
-	(n_steps, n_actions, n_sessions) = size(env.r_m)
+	function OU_bandit_delay_outlier_environment(n_steps, n_sessions, r_0_v, γ_v, μ_v, σ_v, 
+												r_outlier, outlier_delay_distr)
 
-	for session = 1 : n_sessions
+		rng = MersenneTwister()
+
+		n_bandits = length(μ_v)
+
+		r_m = zeros(n_steps, n_bandits, n_sessions)
+
+		for session = 1 : n_sessions
+
+			r_m[1, :, session] = r_0_v
+
+			for cstep = 2 : n_steps
+
+				r_m[cstep, :, session] = r_m[cstep - 1, :, session] .+ γ_v .* (μ_v .- r_m[cstep - 1, :, session]) .+ 
+										σ_v .* rand(rng, Normal(0, 1), n_bandits)
+
+			end
+		end
+
+		new(n_steps, n_bandits, n_sessions, γ_v, μ_v, σ_v, 
+			r_outlier, outlier_delay_distr, r_m, zeros(n_steps, n_bandits, n_sessions), rng)
+	end
+end
+
+function (env::OU_bandit_delay_outlier_environment)(action, cstep, session)
+	
+	if action == 1
+
+		delayed_step_outlier = rand(env.rng, env.outlier_delay_distr) + 1 	# when env.outlier_delay_distr is Geometric 
+																			# number of failures of outlier occurence is being sampled 
+																			# so +1 is required
+
+		if cstep + delayed_step_outlier <= env.n_steps
+
+			env.r_outlier_m[cstep + delayed_step_outlier, :, session] .= env.r_outlier
+
+		end
+
+	end
+	return env.r_m[cstep, action, session] + env.r_outlier_m[cstep, action, session]
+end
+
+function reset_environment!(env::abstract_bandit_environment)
+
+	env.r_outlier_m[:] = zeros(env.n_steps, env.n_bandits, env.n_sessions)
+
+end
+
+function run_environment!(env::OU_bandit_distribution_outlier_environment, agent::abstract_bandit_agent)
+
+	for session = 1 : env.n_sessions
 
 		agent.action_m[1, session] = agent.policy(agent.r_m[1, :, session] .+ agent.bias.b_m[1, :, session])
 
 		r = env(agent.action_m[1, session], 1, session)
 
-		for cstep = 2 : n_steps
+		for cstep = 2 : env.n_steps
 
-			action = agent(r, cstep, session)
+			action = agent(r, cstep, session, 1:env.n_bandits)
 
 			r = env(action, cstep, session)
 		end
@@ -115,21 +189,97 @@ function run_environment!(env::OU_bandit_environment, agent::abstract_bandit_age
 	end	
 end
 
-function run_environment!(env::OU_bandit_environment, agent::abstract_optimal_bandit_agent)
+function run_environment!(env::Union{OU_bandit_frequency_outlier_environment, OU_bandit_delay_outlier_environment}, 
+						agent::abstract_bandit_agent)
 
-	(n_steps, n_actions, n_sessions) = size(env.r_m)
+	for session = 1 : env.n_sessions
 
-	for session = 1 : n_sessions
+		agent.action_m[1, session] = agent.policy(agent.r_m[1, :, session] .+ agent.bias.b_m[1, :, session])
+
+		r = env(agent.action_m[1, session], 1, session)
+
+		for cstep = 2 : env.n_steps
+
+			action = agent(r, cstep, session, 1:env.n_bandits)
+
+			r = env(action, cstep, session)
+
+		end
+
+		agent.bias(session)
+	end	
+
+	reset_environment!(env)
+end
+
+function run_environment!(env::OU_bandit_distribution_outlier_environment, agent::abstract_optimal_bandit_agent)
+
+	for session = 1 : env.n_sessions
 		
 		agent.action_m[1, session] = agent.policy(env.r_m[1, :, session])
 
 		r = env(agent.action_m[1, session], 1, session)
 
-		for cstep = 2 : n_steps
+		for cstep = 2 : env.n_steps
 
-			action = agent(r, env.r_m[cstep, :, session], cstep, session)
+			action = agent(r, env.r_m[cstep, :, session] + env.r_outlier_m[cstep, :, session], cstep, session, 1:env.n_bandits)
 
 			r = env(action, cstep, session)
 		end
+	end	
+end
+
+function run_environment!(env::Union{OU_bandit_frequency_outlier_environment, OU_bandit_delay_outlier_environment}, 
+						agent::abstract_optimal_bandit_agent)
+
+	for session = 1 : env.n_sessions
+		
+		agent.action_m[1, session] = agent.policy(env.r_m[1, :, session] + env.r_outlier_m[1, :, session])
+
+		r = env(agent.action_m[1, session], 1, session)
+
+		for cstep = 2 : env.n_steps
+
+			action = agent(r, env.r_m[cstep, :, session] + env.r_outlier_m[cstep, :, session], cstep, session, 1:env.n_bandits)
+
+			r = env(action, cstep, session)
+
+		end
+	end	
+
+	reset_environment!(env)
+end
+
+struct ABT_environment <: abstract_environment
+	n_trials::Int64
+	n_bandits::Int64
+	n_sessions::Int64
+	r_v::Array{Float64, 1}					# actions x 1
+	manipulation_δr_v::Array{Float64, 1}	# sessions x 1
+	available_action_m::Array{Int64}		# available actions x sessions
+end
+
+(env::ABT_environment)(action) = env.r_v[action]
+
+function run_environment!(env::ABT_environment, agent::abstract_bandit_agent)
+
+	for session = 1 : env.n_sessions
+
+		agent.action_m[1, session] = env.available_action_m[agent.policy(agent.r_m[1, env.available_action_m[:, session], session] .+ 
+																		agent.bias.b_m[1, env.available_action_m[:, session], session]), 
+															session]
+
+		r = env(agent.action_m[1, session])	
+
+		for trial = 2 : env.n_trials
+
+			action = agent(r, trial, session, env.available_action_m[:, session])
+
+			r = env(action)
+		end
+
+		agent.bias.Δr += env.manipulation_δr_v[session]
+		
+		agent.bias(session)
 	end	
 end
