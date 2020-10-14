@@ -113,10 +113,10 @@ function run_prob_delta_agent_opt(env, agent_param_v, obj_param_v)
 	max_x_v = zeros(length(opt.lower_bounds))
 
 	for η_b_0 in 0.01:0.3:1.0
-		for η_r_0 in 0.1:0.3:1.0
-			for μ_0 in -1.0:0.5:1.0
-				for σ_0 in 0.1:0.3:1.0
-					for ε_0 in 0.0:0.3:1.0
+		for μ_0 in -1.0:0.5:1.0
+			for σ_0 in 0.1:0.3:1.0
+				for ε_0 in 0.0:0.3:1.0
+					for η_r_0 in range(0.1, stop = (0.8/pdf(Normal(μ_0, σ_0), μ_0)), length = 5)
 
 						(max_f, max_x, ret) = optimize(opt, [η_b_0, η_r_0, μ_0, σ_0, ε_0])
 

@@ -5,7 +5,7 @@ const r_colour_v = ["r", "b", "g"]
 const b_colour_v = ["orange", "c", "k"]
 const label_v = ["A", "B", "blank"]
 
-function plot_timeseries(r_m::Array{Float64}, b_m::Array{Float64}, available_action_m::Array{Int64},
+function plot_timeseries(r_m::Array{Float64}, b_m::Array{Float64}, Δr_v::Array{Float64,1},
 						sessions_to_plot::Union{AbstractRange{Int64}, Int64})
 
 	(n_steps, n_bandits, n_sessions) = size(r_m[:,:, sessions_to_plot])
@@ -14,10 +14,9 @@ function plot_timeseries(r_m::Array{Float64}, b_m::Array{Float64}, available_act
 
 	plotted_label_v = Array{Int64, 1}()
 
-	figure()
-	ax = gca()
+	fig, ax = subplots(2, 1, sharex = true)
 
-	for i = 1 : n_sessions
+	for i in sessions_to_plot
 		
 		x_range_r = collect(((i - 1)*(n_steps + n_bias_steps) + 1) : 
 							((i - 1)*(n_steps + n_bias_steps) + n_steps))
@@ -29,13 +28,13 @@ function plot_timeseries(r_m::Array{Float64}, b_m::Array{Float64}, available_act
 
 			if j in plotted_label_v
 
-				plot(x_range_b, b_m[:, j, i], color = b_colour_v[j])
-				plot(x_range_r, r_m[:, j, i], color = r_colour_v[j])
+				ax[1].plot(x_range_b, b_m[:, j, i], color = b_colour_v[j])
+				ax[1].plot(x_range_r, r_m[:, j, i], color = r_colour_v[j])
 
 			else
 
-				plot(x_range_b, b_m[:, j, i], color = b_colour_v[j], label = latexstring("b_{$j}"))
-				plot(x_range_r, r_m[:, j, i], color = r_colour_v[j], label = latexstring("r_{$j}"))
+				ax[1].plot(x_range_b, b_m[:, j, i], color = b_colour_v[j], label = latexstring("b_{$j}"))
+				ax[1].plot(x_range_r, r_m[:, j, i], color = r_colour_v[j], label = latexstring("r_{$j}"))
 
 				append!(plotted_label_v, j)
 			end
@@ -43,13 +42,21 @@ function plot_timeseries(r_m::Array{Float64}, b_m::Array{Float64}, available_act
 
 	end
 
-	ax.set_xlabel("session", fontsize = 20)
-	ax.set_ylabel("value", fontsize = 20)
+	ax[1].set_ylabel("value", fontsize = 20)
 
-	ax.set_xticks(1:(n_steps + n_bias_steps) * Int64(ceil(0.2*n_sessions)):n_sessions*(n_steps + n_bias_steps))
-	ax.set_xticklabels(string.(collect(1:Int64(ceil(0.2*n_sessions)):n_sessions)))
+	ax[1].legend(fontsize = 20, frameon = false)
 
-	ax.legend(fontsize = 20, frameon = false)
+	ax[2].plot(((sessions_to_plot[1] - 1)*(n_steps + n_bias_steps) + 1) : (n_steps + n_bias_steps) :
+				((sessions_to_plot[end] - 1)*(n_steps + n_bias_steps) + 1), Δr_v[sessions_to_plot])
+
+	ax[2].set_xticks(((sessions_to_plot[1] - 1)*(n_steps + n_bias_steps) + 1) : (n_steps + n_bias_steps) :
+				((sessions_to_plot[end] - 1)*(n_steps + n_bias_steps) + 1))
+
+	ax[2].set_xticklabels(string.(sessions_to_plot[1] : 1 : sessions_to_plot[end]))
+
+	ax[2].set_xlabel("session", fontsize = 20)
+	ax[2].set_ylabel(latexstring("\\Delta r"), fontsize = 20)
+
 	show()
 end
 

@@ -11,7 +11,7 @@ mutable struct offline_bias
 	η::Float64
 	decay::Float64
 	b_m::Array{Float64}		# offline steps x actions x sessions
-	Δr::Float64
+	Δr_v::Array{Float64, 1}
 	surprise_v::Array{Float64, 1}
 	action_v::Array{Int64, 1}
 	rng::AbstractRNG
@@ -22,7 +22,7 @@ mutable struct offline_bias
 																				η, 
 																				decay, 
 																				zeros(n_steps + 1, n_actions, n_sessions), 
-																				0.0, 
+																				zeros(n_sessions), 
 																				zeros(buffer_length), 
 																				zeros(buffer_length),
 																				MersenneTwister())
@@ -38,7 +38,7 @@ function (bias::offline_bias)(session)
 
 		action = bias.action_v[s]
 
-		bias.b_m[i, action, session] = bias.b_m[i - 1, action, session] + bias.η * bias.Δr/bias.n_steps
+		bias.b_m[i, action, session] = bias.b_m[i - 1, action, session] + bias.η * bias.Δr_v[session]/bias.n_steps
 
 		bias.b_m[i, 1:size(bias.b_m)[2] .!= action, session] .= (1.0 - bias.decay) * 
 																bias.b_m[i - 1, 1:size(bias.b_m)[2] .!= action, session]
@@ -70,7 +70,6 @@ end
 
 function reset_offline_buffer!(bias::offline_bias)
 
-	bias.Δr = 0.0
 	bias.surprise_v[:] = zeros(bias.buffer_length)
 	bias.action_v[:] = zeros(bias.buffer_length)
 
@@ -125,7 +124,7 @@ function (agent::delta_agent)(r_environment, cstep, session, available_action_v)
 
 	δr = r_environment - agent.r_m[cstep - 1, latest_action, session]
 
-	agent.bias.Δr += δr - agent.bias.b_m[1, latest_action, session]
+	agent.bias.Δr_v[session] += δr - agent.bias.b_m[1, latest_action, session]
 
 	surprise = abs(δr)
 
@@ -183,7 +182,8 @@ function (agent::probabilistic_delta_agent)(r_environment, cstep, session, avail
 
 	δr = r_environment - agent.r_m[cstep - 1, latest_action, session]
 
-	agent.bias.Δr += δr - agent.bias.b_m[1, latest_action, session]
+	agent.bias.Δr_v[session] += δr - agent.bias.b_m[1, latest_action, session]
+	#agent.bias.Δr_v[session] += δr - agent.bias.b_m[1, 1, session] - agent.bias.b_m[1, 2, session]
 
 	surprise = -logpdf(Normal(agent.μ, agent.σ), r_environment)
 
@@ -243,7 +243,7 @@ function (agent::advantage_delta_agent)(r_environment, cstep, session, available
 
 	δr_offline = δr - agent.bias.b_m[1, latest_action, session]
 
-	agent.bias.Δr += δr_offline
+	agent.bias.Δr_v[session] += δr_offline
 
 	surprise = abs(δr_offline)
 
