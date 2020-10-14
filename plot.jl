@@ -24,7 +24,7 @@ function plot_timeseries(r_m::Array{Float64}, b_m::Array{Float64}, Δr_v::Array{
 		x_range_b = collect(((i - 1)*(n_steps + n_bias_steps) + n_steps + 1) : 
 							((i - 1)*(n_steps + n_bias_steps) + n_steps + n_bias_steps))
 
-		for j in available_action_m[:, i]
+		for j in 1:n_bandits
 
 			if j in plotted_label_v
 
@@ -49,10 +49,10 @@ function plot_timeseries(r_m::Array{Float64}, b_m::Array{Float64}, Δr_v::Array{
 	ax[2].plot(((sessions_to_plot[1] - 1)*(n_steps + n_bias_steps) + 1) : (n_steps + n_bias_steps) :
 				((sessions_to_plot[end] - 1)*(n_steps + n_bias_steps) + 1), Δr_v[sessions_to_plot])
 
-	ax[2].set_xticks(((sessions_to_plot[1] - 1)*(n_steps + n_bias_steps) + 1) : (n_steps + n_bias_steps) :
-				((sessions_to_plot[end] - 1)*(n_steps + n_bias_steps) + 1))
+	ax[2].set_xticks(((sessions_to_plot[1] - 1)*(n_steps + n_bias_steps) + 1) : (n_steps + n_bias_steps) * Int(ceil(0.2*n_sessions)) :
+					((sessions_to_plot[end] - 1)*(n_steps + n_bias_steps) + 1))
 
-	ax[2].set_xticklabels(string.(sessions_to_plot[1] : 1 : sessions_to_plot[end]))
+	ax[2].set_xticklabels(string.(sessions_to_plot[1] : Int(ceil(0.2*n_sessions)) : sessions_to_plot[end]))
 
 	ax[2].set_xlabel("session", fontsize = 20)
 	ax[2].set_ylabel(latexstring("\\Delta r"), fontsize = 20)

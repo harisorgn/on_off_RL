@@ -120,7 +120,7 @@ function run_bandit_example(env::abstract_bandit_environment, agent_v::Array{T, 
 								 	(sum(optimal_agent.accumulated_r_v) - sum(random_agent.accumulated_r_v)))
 
 		if plot_flag
-			plot_timeseries(agent.r_m, agent.bias.b_m, agent.bias.Δr_v, 5:10)
+			plot_timeseries(agent.r_m, agent.bias.b_m, agent.bias.Δr_v, 1:40)
 		end
 
 		c += 1
