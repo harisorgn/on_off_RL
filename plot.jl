@@ -5,39 +5,46 @@ const r_colour_v = ["r", "b", "g"]
 const b_colour_v = ["orange", "c", "k"]
 const label_v = ["A", "B", "blank"]
 
-function plot_timeseries(r_m::Array{Float64}, b_m::Array{Float64}, Δr_v::Array{Float64,1},
-						sessions_to_plot::Union{AbstractRange{Int64}, Int64})
+function plot_bandit_results(env::abstract_bandit_environment, agent::abstract_bandit_agent,
+							sessions_to_plot::Union{AbstractRange{Int64}, Int64})
 
-	(n_steps, n_bandits, n_sessions) = size(r_m[:,:, sessions_to_plot])
+	(n_steps, n_bandits, n_sessions) = size(agent.r_m[:,:, sessions_to_plot])
 
-	n_bias_steps = size(b_m)[1]
+	n_bias_steps = agent.bias.n_steps + 1
 
 	plotted_label_v = Array{Int64, 1}()
 
-	fig, ax = subplots(2, 1, sharex = true)
+	fig, ax = subplots(3, 1, sharex = true)
 
-	for i in sessions_to_plot
+	for session in sessions_to_plot
 		
-		x_range_r = collect(((i - 1)*(n_steps + n_bias_steps) + 1) : 
-							((i - 1)*(n_steps + n_bias_steps) + n_steps))
+		x_range_r = collect(((session - 1)*(n_steps + n_bias_steps) + 1) : 
+							((session - 1)*(n_steps + n_bias_steps) + n_steps))
 
-		x_range_b = collect(((i - 1)*(n_steps + n_bias_steps) + n_steps + 1) : 
-							((i - 1)*(n_steps + n_bias_steps) + n_steps + n_bias_steps))
+		x_range_b = collect(((session - 1)*(n_steps + n_bias_steps) + n_steps + 1) : 
+							((session - 1)*(n_steps + n_bias_steps) + n_steps + n_bias_steps))
 
-		for j in 1:n_bandits
+		for bandit in 1:n_bandits
 
-			if j in plotted_label_v
+			if bandit in plotted_label_v
 
-				ax[1].plot(x_range_b, b_m[:, j, i], color = b_colour_v[j])
-				ax[1].plot(x_range_r, r_m[:, j, i], color = r_colour_v[j])
+				ax[1].plot(x_range_b, agent.bias.b_m[:, bandit, session], color = b_colour_v[bandit])
+				ax[1].plot(x_range_r, agent.r_m[:, bandit, session], color = r_colour_v[bandit])
 
 			else
 
-				ax[1].plot(x_range_b, b_m[:, j, i], color = b_colour_v[j], label = latexstring("b_{$j}"))
-				ax[1].plot(x_range_r, r_m[:, j, i], color = r_colour_v[j], label = latexstring("r_{$j}"))
+				ax[1].plot(x_range_b, agent.bias.b_m[:, bandit, session], color = b_colour_v[bandit], label = latexstring("b_{$bandit}"))
+				ax[1].plot(x_range_r, agent.r_m[:, bandit, session], color = r_colour_v[bandit], label = latexstring("r_{$bandit}"))
 
-				append!(plotted_label_v, j)
+				append!(plotted_label_v, bandit)
 			end
+
+			ax[2].plot(x_range_r, env.r_m[:, bandit, session] .+ env.r_outlier_m[:, bandit, session], color = r_colour_v[bandit])
+
+			idx_v = findall(x -> x == bandit, agent.action_m[:, session])
+
+			ax[3].hlines(fill(bandit, length(idx_v)), vcat(x_range_r, x_range_b)[idx_v], vcat(x_range_r, x_range_b)[idx_v .+ 1],
+						color = r_colour_v[bandit])
 		end
 
 	end
@@ -46,63 +53,81 @@ function plot_timeseries(r_m::Array{Float64}, b_m::Array{Float64}, Δr_v::Array{
 
 	ax[1].legend(fontsize = 20, frameon = false)
 
-	ax[2].plot(((sessions_to_plot[1] - 1)*(n_steps + n_bias_steps) + 1) : (n_steps + n_bias_steps) :
-				((sessions_to_plot[end] - 1)*(n_steps + n_bias_steps) + 1), Δr_v[sessions_to_plot])
+	ax[2].set_ylabel("reward", fontsize = 20)
 
-	ax[2].set_xticks(((sessions_to_plot[1] - 1)*(n_steps + n_bias_steps) + 1) : (n_steps + n_bias_steps) * Int(ceil(0.2*n_sessions)) :
+	ax[3].set_yticks(1:n_bandits)
+	ax[3].set_yticklabels(string.(1:n_bandits))
+
+	ax[3].set_ylabel("choice", fontsize = 20)
+	ax[3].set_xlabel("session", fontsize = 20)
+
+	ax[3].set_xticks(((sessions_to_plot[1] - 1)*(n_steps + n_bias_steps) + 1) : (n_steps + n_bias_steps) * Int(ceil(0.2*n_sessions)) :
 					((sessions_to_plot[end] - 1)*(n_steps + n_bias_steps) + 1))
 
-	ax[2].set_xticklabels(string.(sessions_to_plot[1] : Int(ceil(0.2*n_sessions)) : sessions_to_plot[end]))
-
-	ax[2].set_xlabel("session", fontsize = 20)
-	ax[2].set_ylabel(latexstring("\\Delta r"), fontsize = 20)
+	ax[3].set_xticklabels(string.(sessions_to_plot[1] : Int(ceil(0.2*n_sessions)) : sessions_to_plot[end]))
 
 	show()
 end
 
-function plot_ABT(r_m::Array{Float64}, b_m::Array{Float64}, available_action_m::Array{Int64})
+function plot_performance(env_v::Array{Y,1}, agent_v::Array{T, 1}, n_runs::Int64) where {T <: abstract_bandit_agent, 
+																						Y <: abstract_bandit_environment}
 
-	(n_trials, n_actions, n_sessions) = size(r_m)
+	score_m = zeros(n_runs, length(agent_v))
 
-	n_bias_steps = size(b_m)[1]
+	for i = 1:n_runs
+		for env in env_v
 
-	plotted_label_v = Array{Int64, 1}()
+			agent_v = initialise_new_instance.(agent_v, env.n_steps, env.n_bandits, env.n_sessions)
+
+			env = initialise_new_instance(env)
+
+			score_m[i, :] .+= run_bandit_example(env, agent_v)
+
+		end
+	end
 
 	figure()
 	ax = gca()
 
-	for i = 1 : n_sessions
-		
-		x_range_r = collect(((i - 1)*(n_trials + n_bias_steps) + 1) : 
-							((i - 1)*(n_trials + n_bias_steps) + n_trials))
+	for i = 1:length(agent_v)
+		scatter(fill(i, n_runs), score_m[:, i])
+	end
 
-		x_range_b = collect(((i - 1)*(n_trials + n_bias_steps) + n_trials + 1) : 
-							((i - 1)*(n_trials + n_bias_steps) + n_trials + n_bias_steps))
+	ax.set_xticks(1:length(agent_v))
 
-		for j in available_action_m[:, i]
+	if length(agent_v) == 2
+		ax.set_xticklabels([L"\delta", L"prob \ \delta"], fontsize = 20)
+	end
 
-			if j in plotted_label_v
+	ax.set_ylabel("score", fontsize = 20)
 
-				plot(x_range_b, b_m[:, j, i], color = b_colour_v[j])
-				plot(x_range_r, r_m[:, j, i], color = r_colour_v[j])
+	show()
+end
 
-			else
+function plot_OU(γ_v, σ_v; t = 40.0, t_0 = 0.0, x_0 = 0.0)
 
-				plot(x_range_b, b_m[:, j, i], color = b_colour_v[j], label = latexstring("bias_{$(label_v[j])}"))
-				plot(x_range_r, r_m[:, j, i], color = r_colour_v[j], label = latexstring("reward_{$(label_v[j])}"))
+	x_r = -20.0:0.01:20.0
 
-				append!(plotted_label_v, j)
-			end
-		end
+	d = Normal(0.0, 1.0)
+
+	figure()
+	ax = gca()
+
+	#plot(x_r, pdf.(d, x_r), color = "k", label = "N(0,1)")
+
+	for i = 1 : length(γ_v)
+
+		plot(x_r, OU_distr.(x_r, γ_v[i], σ_v[i], t), label = "γ = $(γ_v[i])")
 
 	end
 
-	ax.set_xlabel("session", fontsize = 20)
-	ax.set_ylabel("value", fontsize = 20)
-
-	ax.set_xticks(1:(n_trials + n_bias_steps) * Int64(ceil(0.2*n_sessions)):n_sessions*(n_trials + n_bias_steps))
-	ax.set_xticklabels(string.(collect(1:Int64(ceil(0.2*n_sessions)):n_sessions)))
 
 	ax.legend(fontsize = 20, frameon = false)
 	show()
+
 end
+
+
+
+
+

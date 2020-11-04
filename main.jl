@@ -1,37 +1,47 @@
 using Distributions
 using Random
 using Statistics
+using JLD
+using NLopt
 
 include("agents.jl")
 include("environments.jl")
 include("auxiliary.jl")
-include("plot.jl")
 include("opt.jl")
+include("plot.jl")
 
 function main()
-	
-	
-	env = initialise_OU_bandit_test_environment()
 
-	run_test(env)
-	
-	#___optimal solutions___
-	#___delay outliers :___
-		#___for γ_OU = 0.5___
-		#___got 3.1589609139471158 at [0.02586607418559992, 0.062244390384246874, 0.011123611527260274]
+	#=
+	n_steps = 40
+	n_sessions = 10
+	n_bandits = 2
 
-		#___got 3.293557551604378 at [0.01014696200106897, 0.5084338393165342, -0.03331235721280511, 
-		#							0.46402632102787394, 0.0015130881520036001]
+	μ_v = [0.0, 0.0]
+	σ_v = [1.0, 1.0]
+	γ_v = [0.01, 0.01]
 
-		#___for γ_OU = 0.05___
-		#___got 1.1430349013705852 at [3.5161869569188115e-11, 0.005024919000604983, 9.784188848809583e-20]
-		#___got 1.20498651997311 at [0.010000000000000038, 0.2005302619704816, 0.9999999999999987, 0.10000000000000049, 0.0]
+	env_v = [initialise_OU_bandit_environment(n_steps, n_bandits, n_sessions, μ_v, σ_v, γ_v),
+			initialise_OU_bandit_distribution_outlier_environment(n_steps, n_bandits, n_sessions, μ_v, σ_v, γ_v),
+			initialise_OU_bandit_frequency_outlier_environment(n_steps, n_bandits, n_sessions, μ_v, σ_v, γ_v),
+			initialise_OU_bandit_delay_outlier_environment(n_steps, n_bandits, n_sessions, μ_v, σ_v, γ_v)]
 
-	#___distribution outliers :___
-		#___for γ_OU = 0.01___
-		#___got 0.26627876014066393 at [0.005444349726657959, 0.122691271065347, 0.02184692336067285]
-		#___got 0.3473206169976994 at [0.01043490792847121, 3.820573809321562, -0.21352021356437306, 3.3377601216016193, 0.042910834965697926]
-	
+	run_opt(env_v)	
+	=#
+
+	#=
+	file_name = "opt_res_9254.jld"
+
+	env_v = load(file_name, "env_v")
+	d_agent = load(file_name, "d_agent")
+	prob_d_agent = load(file_name, "prob_d_agent")
+
+	println("γ = ", env_v[1].γ_v[1])
+
+	plot_performance([env_v[3]], [d_agent, prob_d_agent], 100)
+	=#
+
+	#plot_OU([0.01, 0.1, 0.2, 0.5], [1.0, 1.0, 1.0, 1.0] ; t = 10.0)
 end
 
 main()

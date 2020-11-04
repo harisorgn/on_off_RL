@@ -146,6 +146,20 @@ function (agent::delta_agent)(r_environment, cstep, session, available_action_v)
 	return agent.action_m[cstep, session]
 end
 
+initialise_new_instance(agent::delta_agent, n_steps, n_actions, n_sessions) = delta_agent(n_steps, 
+																						n_actions, 
+																						n_sessions, 
+																						agent.η, 
+																						agent.decay, 
+																						offline_bias(
+																							Int(floor(0.5*n_steps)), 
+																							n_actions, 
+																							n_sessions, 
+																							Int(floor(0.2*n_steps)), 
+																							agent.bias.η, 
+																							agent.bias.decay), 
+																						agent.policy)
+
 struct probabilistic_delta_agent <: abstract_bandit_agent
 	n_steps::Int64
 	n_actions::Int64
@@ -172,6 +186,7 @@ struct probabilistic_delta_agent <: abstract_bandit_agent
 																								zeros(n_sessions), 
 																								bias, 
 																								policy)
+
 end
 
 function (agent::probabilistic_delta_agent)(r_environment, cstep, session, available_action_v)
@@ -183,7 +198,6 @@ function (agent::probabilistic_delta_agent)(r_environment, cstep, session, avail
 	δr = r_environment - agent.r_m[cstep - 1, latest_action, session]
 
 	agent.bias.Δr_v[session] += δr - agent.bias.b_m[1, latest_action, session]
-	#agent.bias.Δr_v[session] += δr - agent.bias.b_m[1, 1, session] - agent.bias.b_m[1, 2, session]
 
 	surprise = -logpdf(Normal(agent.μ, agent.σ), r_environment)
 
@@ -206,6 +220,22 @@ function (agent::probabilistic_delta_agent)(r_environment, cstep, session, avail
 	return agent.action_m[cstep, session]
 end
 
+initialise_new_instance(agent::probabilistic_delta_agent, n_steps, n_actions, n_sessions) = probabilistic_delta_agent(n_steps, 
+																												n_actions, 
+																												n_sessions, 
+																												agent.η, 
+																												agent.decay, 
+																												agent.μ, 
+																												agent.σ, 
+																												offline_bias(
+																													Int(floor(0.5*n_steps)), 
+																													n_actions, 
+																													n_sessions, 
+																													Int(floor(0.2*n_steps)), 
+																													agent.bias.η, 
+																													agent.bias.decay),
+																												agent.policy) 
+																											
 #----------------------------------------------------------------------------------------------------------------------------------
 #--------------------------Under development---------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------------------------------------------
@@ -335,8 +365,12 @@ function (agent::optimal_bandit_frequency_outlier_agent)(r_environment, next_r_e
 	return agent.action_m[cstep, session]
 end
 
-function reset_agent!(agent::Union{abstract_bandit_agent, abstract_optimal_bandit_agent})
+function reset_agent!(agent::abstract_bandit_agent)
 
 	agent.accumulated_r_v[:] = zeros(length(agent.accumulated_r_v))
+	agent.action_m[:] = zeros(Int64, agent.n_steps, agent.n_sessions)
+	agent.r_m[:] = zeros(agent.n_steps, agent.n_actions, agent.n_sessions)
 
+	agent.bias.b_m[:] = zeros(agent.bias.n_steps + 1, agent.n_actions, agent.n_sessions)
+	agent.bias.Δr_v[:] = zeros(agent.n_sessions)
 end
