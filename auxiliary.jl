@@ -12,18 +12,18 @@ get_optimal_agent(env::OU_bandit_frequency_outlier_environment) = optimal_bandit
 																										env.η_p_outlier, 
 																										env.decay_p_outlier)
 
-OU_distr(x, γ, σ, t; t_0  = 0.0, x_0 = 0.0) = sqrt(γ / (2.0 * pi * (σ^2.0 / 2.0) * (1.0 - exp(-2.0 * γ * (t - t_0))))) * 
+OU_distr(x, t, γ, σ; t_0  = 0.0, x_0 = 0.0) = sqrt(γ / (2.0 * pi * (σ^2.0 / 2.0) * (1.0 - exp(-2.0 * γ * (t - t_0))))) * 
 											exp(-(γ * (x - x_0 * exp(-γ * (t - t_0)))^2.0)/
 												(2.0 * (σ^2.0 / 2.0) * (1.0 - exp(-2.0 * γ * (t - t_0)))))
 
-function initialise_OU_bandit_environment(n_steps, n_bandits, n_sessions, μ_v, σ_v, γ_v)
+function initialise_OU_bandit_environment(n_warmup_steps, n_steps, n_bandits, n_sessions, μ_v, σ_v, γ_v)
 
 	r_0_v = zeros(n_bandits)
 
-	return OU_bandit_environment(n_steps, n_sessions, r_0_v, γ_v, μ_v, σ_v)
+	return OU_bandit_environment(n_warmup_steps, n_steps, n_sessions, r_0_v, γ_v, μ_v, σ_v)
 end
 
-function initialise_OU_bandit_distribution_outlier_environment(n_steps, n_bandits, n_sessions, μ_v, σ_v, γ_v)
+function initialise_OU_bandit_distribution_outlier_environment(n_warmup_steps, n_steps, n_bandits, n_sessions, μ_v, σ_v, γ_v)
 
 	outlier1_distr = MixtureModel(Normal, [(0.0, 0.01), (10.0, 0.1), (-10.0, 0.1)], 
 								  [0.8, 		0.15, 		0.05])
@@ -33,10 +33,11 @@ function initialise_OU_bandit_distribution_outlier_environment(n_steps, n_bandit
 
 	r_0_v = zeros(n_bandits)
 
-	return OU_bandit_distribution_outlier_environment(n_steps, n_sessions, r_0_v, γ_v, μ_v, σ_v, [outlier1_distr, outlier2_distr])
+	return OU_bandit_distribution_outlier_environment(n_warmup_steps, n_steps, n_sessions, r_0_v, γ_v, μ_v, σ_v, 
+													[outlier1_distr, outlier2_distr])
 end
 
-function initialise_OU_bandit_frequency_outlier_environment(n_steps, n_bandits, n_sessions, μ_v, σ_v, γ_v)
+function initialise_OU_bandit_frequency_outlier_environment(n_warmup_steps, n_steps, n_bandits, n_sessions, μ_v, σ_v, γ_v)
 
 	r_0_v = zeros(n_bandits)
 	
@@ -45,39 +46,30 @@ function initialise_OU_bandit_frequency_outlier_environment(n_steps, n_bandits, 
 	η_p_outlier = 0.05 
 	decay_p_outlier = 0.1
 
-	return OU_bandit_frequency_outlier_environment(n_steps, n_sessions, r_0_v, γ_v, μ_v, σ_v, 
+	return OU_bandit_frequency_outlier_environment(n_warmup_steps, n_steps, n_sessions, r_0_v, γ_v, μ_v, σ_v, 
 												r_outlier, p_outlier_max, η_p_outlier, decay_p_outlier)
 end
 
-function initialise_OU_bandit_delay_outlier_environment(n_steps, n_bandits, n_sessions, μ_v, σ_v, γ_v)
+function initialise_OU_bandit_delay_outlier_environment(n_warmup_steps, n_steps, n_bandits, n_sessions, μ_v, σ_v, γ_v)
 
 	r_0_v = zeros(n_bandits)
 
 	r_outlier = 10.0 
 	outlier_delay_distr = Geometric(0.02)
 
-	return OU_bandit_delay_outlier_environment(n_steps, n_sessions, r_0_v, γ_v, μ_v, σ_v, r_outlier, outlier_delay_distr)
+	return OU_bandit_delay_outlier_environment(n_warmup_steps, n_steps, n_sessions, r_0_v, γ_v, μ_v, σ_v, r_outlier, outlier_delay_distr)
 end
 
-function initialise_OU_bandit_test_environment(n_steps, n_bandits, n_sessions, μ_v, σ_v, γ_v)
+function initialise_OU_bandit_test_environment(n_warmup_steps, n_steps, n_bandits, n_sessions, μ_v, σ_v, γ_v)
 
 	r_0_v = zeros(n_bandits)
 
 	r_outlier = 10.0 
 
-	return OU_bandit_test_environment(n_steps, n_sessions, r_0_v, γ_v, μ_v, σ_v, r_outlier)
+	return OU_bandit_test_environment(n_warmup_steps, n_steps, n_sessions, r_0_v, γ_v, μ_v, σ_v, r_outlier)
 end
 
 function run_bandit_example(env::abstract_bandit_environment, agent_v::Array{T, 1}; plot_flag = false) where T <:abstract_bandit_agent
-
-	optimal_agent = get_optimal_agent(env)
-
-	random_agent = delta_agent(env.n_steps, env.n_bandits, env.n_sessions, 0.0, 0.0,
-							offline_bias(10, env.n_bandits, env.n_sessions, 10, 0.0, 0.0), 
-							ε_greedy_policy(1.0))
-
-	run_environment!(env, optimal_agent)
-	run_environment!(env, random_agent)
 
 	score_v = zeros(length(agent_v))
 
@@ -86,11 +78,12 @@ function run_bandit_example(env::abstract_bandit_environment, agent_v::Array{T, 
 	
 		run_environment!(env, agent)
 
-		#score_v[c] = (sum(agent.accumulated_r_v) - sum(random_agent.accumulated_r_v)) / 
-		#			(sum(optimal_agent.accumulated_r_v) - sum(random_agent.accumulated_r_v))
 		score_v[c] = sum(agent.accumulated_r_v)
 
 		if plot_flag
+
+			println(typeof(agent), " score : ", score_v[c])
+
 			plot_bandit_results(env, agent, 1:10)
 		end
 
@@ -102,46 +95,50 @@ end
 
 function run_opt(env_v::Array{T,1}) where T <: abstract_bandit_environment
 
-	random_obj = 0.0
-	optimal_obj = 0.0
+	#___objective function patameter vector = [decay_bias, decay_reward, γ_ΟU, σ_OU]___
+	obj_param_v = [0.01, 0.01, env_v[1].γ_v[1], env_v[1].σ_v[1]]
 
-	for env in env_v
+	d_agent_bias_v = run_delta_agent_opt(env_v, obj_param_v, offline_bias)
 
-		optimal_agent = get_optimal_agent(env)
+	d_agent_bias = delta_agent(env_v[1].n_steps, env_v[1].n_bandits, env_v[1].n_sessions, d_agent_bias_v[2], obj_param_v[2], 
+								offline_bias(Int(floor(0.5*env_v[1].n_steps)), env_v[1].n_bandits, env_v[1].n_sessions, 
+											Int(floor(0.2*env_v[1].n_steps)), d_agent_bias_v[1], obj_param_v[1]), 
+								ε_greedy_policy(d_agent_bias_v[3]))
 
-		random_agent = delta_agent(env.n_steps, env.n_bandits, env.n_sessions, 0.0, 0.0,
-									offline_bias(10, env.n_bandits, env.n_sessions, 10, 0.0, 0.0), 
-									ε_greedy_policy(1.0))
+	d_agent_Q_v = run_delta_agent_opt(env_v, obj_param_v, offline_Q)
 
-		run_environment!(env, random_agent)
-		run_environment!(env, optimal_agent)
+	d_agent_Q = delta_agent(env_v[1].n_steps, env_v[1].n_bandits, env_v[1].n_sessions, d_agent_Q_v[2], obj_param_v[2], 
+								offline_bias(Int(floor(0.5*env_v[1].n_steps)), env_v[1].n_bandits, env_v[1].n_sessions, 
+											Int(floor(0.2*env_v[1].n_steps)), d_agent_Q_v[1], obj_param_v[1]), 
+								ε_greedy_policy(d_agent_Q_v[3]))
 
-		random_obj += sum(random_agent.accumulated_r_v)
-		optimal_obj += sum(optimal_agent.accumulated_r_v)
 
-	end
+	d_agent_no_offline_v = run_delta_agent_no_offline_opt(env_v, obj_param_v)
 
-	#___objective function patameter vector = [sum performance of optimal agent, sum performance of random agent]___
-	obj_param_v = [optimal_obj, random_obj]
+	d_agent_no_offline = delta_agent(env_v[1].n_steps, env_v[1].n_bandits, env_v[1].n_sessions, d_agent_no_offline_v[1], obj_param_v[2], 
+								offline_bias(Int(floor(0.5*env_v[1].n_steps)), env_v[1].n_bandits, env_v[1].n_sessions, 
+											Int(floor(0.2*env_v[1].n_steps)), 0.0, 0.0), 
+								ε_greedy_policy(d_agent_no_offline_v[2]))
 
-	d_agent_x_v = run_delta_agent_opt(env_v, obj_param_v)
-
+	#=
 	prob_d_agent_x_v = run_prob_delta_agent_opt(env_v, obj_param_v)
 
-	d_agent = delta_agent(env_v[1].n_steps, env_v[1].n_bandits, env_v[1].n_sessions, d_agent_x_v[2], 0.01, 
-						offline_bias(Int(floor(0.5*env_v[1].n_steps)), env_v[1].n_bandits, env_v[1].n_sessions, 
-									Int(floor(0.2*env_v[1].n_steps)), d_agent_x_v[1], 0.01), 
-						ε_greedy_policy(d_agent_x_v[3]))
-
 	prob_d_agent = probabilistic_delta_agent(env_v[1].n_steps, env_v[1].n_bandits, env_v[1].n_sessions, prob_d_agent_x_v[2], 
-											0.01, prob_d_agent_x_v[3], prob_d_agent_x_v[4],
+											obj_param_v[2], prob_d_agent_x_v[3], prob_d_agent_x_v[4],
 											offline_bias(Int(floor(0.5*env_v[1].n_steps)), env_v[1].n_bandits, env_v[1].n_sessions, 
-														Int(floor(0.2*env_v[1].n_steps)), prob_d_agent_x_v[1], 0.01),
+														Int(floor(0.2*env_v[1].n_steps)), prob_d_agent_x_v[1], obj_param_v[1]),
 											ε_greedy_policy(prob_d_agent_x_v[5]))
 
+	ou_agent = OU_agent(env_v[1].n_steps, env_v[1].n_bandits, env_v[1].n_sessions, OU_agent_x_v[2], 
+						obj_param_v[2], obj_param_v[3], obj_param_v[4],
+						offline_bias(Int(floor(0.5*env_v[1].n_steps)), env_v[1].n_bandits, env_v[1].n_sessions, 
+									Int(floor(0.2*env_v[1].n_steps)), OU_agent_x_v[1], obj_param_v[1]),
+						ε_greedy_policy(OU_agent_x_v[3]))
+
+	=#
 
 	save(string("opt_res_", rand(MersenneTwister(), 1000:9999), ".jld"), 
-		"env_v", env_v, "d_agent", d_agent, "prob_d_agent", prob_d_agent)
+		"env_v", env_v, "d_agent_bias", d_agent_bias, "d_agent_Q", d_agent_Q, "d_agent_no_offline", d_agent_no_offline)
 
 end
 

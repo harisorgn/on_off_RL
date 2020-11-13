@@ -10,7 +10,7 @@ function plot_bandit_results(env::abstract_bandit_environment, agent::abstract_b
 
 	(n_steps, n_bandits, n_sessions) = size(agent.r_m[:,:, sessions_to_plot])
 
-	n_bias_steps = agent.bias.n_steps + 1
+	n_bias_steps = agent.offline.n_steps + 1
 
 	plotted_label_v = Array{Int64, 1}()
 
@@ -28,12 +28,12 @@ function plot_bandit_results(env::abstract_bandit_environment, agent::abstract_b
 
 			if bandit in plotted_label_v
 
-				ax[1].plot(x_range_b, agent.bias.b_m[:, bandit, session], color = b_colour_v[bandit])
+				ax[1].plot(x_range_b, agent.offline.r_m[:, bandit, session], color = b_colour_v[bandit])
 				ax[1].plot(x_range_r, agent.r_m[:, bandit, session], color = r_colour_v[bandit])
 
 			else
 
-				ax[1].plot(x_range_b, agent.bias.b_m[:, bandit, session], color = b_colour_v[bandit], label = latexstring("b_{$bandit}"))
+				ax[1].plot(x_range_b, agent.offline.r_m[:, bandit, session], color = b_colour_v[bandit], label = latexstring("b_{$bandit}"))
 				ax[1].plot(x_range_r, agent.r_m[:, bandit, session], color = r_colour_v[bandit], label = latexstring("r_{$bandit}"))
 
 				append!(plotted_label_v, bandit)
@@ -69,7 +69,7 @@ function plot_bandit_results(env::abstract_bandit_environment, agent::abstract_b
 	show()
 end
 
-function plot_performance(env_v::Array{Y,1}, agent_v::Array{T, 1}, n_runs::Int64) where {T <: abstract_bandit_agent, 
+function plot_performance(env_v::Array{Y,1}, agent_v::Array{T, 1}; n_runs = 100) where {T <: abstract_bandit_agent, 
 																						Y <: abstract_bandit_environment}
 
 	score_m = zeros(n_runs, length(agent_v))
@@ -95,9 +95,7 @@ function plot_performance(env_v::Array{Y,1}, agent_v::Array{T, 1}, n_runs::Int64
 
 	ax.set_xticks(1:length(agent_v))
 
-	if length(agent_v) == 2
-		ax.set_xticklabels([L"\delta", L"prob \ \delta"], fontsize = 20)
-	end
+	ax.set_xticklabels([L"\delta \ bias", L"\delta \ Q", L"\delta"], fontsize = 20)
 
 	ax.set_ylabel("score", fontsize = 20)
 
@@ -108,16 +106,12 @@ function plot_OU(γ_v, σ_v; t = 40.0, t_0 = 0.0, x_0 = 0.0)
 
 	x_r = -20.0:0.01:20.0
 
-	d = Normal(0.0, 1.0)
-
 	figure()
 	ax = gca()
 
-	#plot(x_r, pdf.(d, x_r), color = "k", label = "N(0,1)")
-
 	for i = 1 : length(γ_v)
 
-		plot(x_r, OU_distr.(x_r, γ_v[i], σ_v[i], t), label = "γ = $(γ_v[i])")
+		plot(x_r, OU_distr.(x_r, t, γ_v[i], σ_v[i]), label = "γ = $(γ_v[i])")
 
 	end
 
