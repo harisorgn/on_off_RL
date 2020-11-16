@@ -173,7 +173,7 @@ end
 
 (policy::ε_greedy_policy)(r_v) = (rand(policy.rng) < (1.0 - policy.ε)) && !all(x->x == r_v[1], r_v) ? argmax(r_v) : rand(policy.rng, 1 : length(r_v))
 
-struct delta_agent{T <: abstract_offline_learning} <: abstract_bandit_agent
+struct delta_agent{T <: abstract_offline_learning, Y <: abstract_policy} <: abstract_bandit_agent
 	n_steps::Int64
 	n_actions::Int64
 	n_sessions::Int64
@@ -183,10 +183,11 @@ struct delta_agent{T <: abstract_offline_learning} <: abstract_bandit_agent
 	r_m::Array{Float64}		# steps x actions x sessions
 	accumulated_r_v::Array{Float64, 1}
 	offline::T
-	policy::abstract_policy
+	policy::Y
 
-	function delta_agent(n_steps, n_actions, n_sessions, η, decay, offline::T, policy) where T <: abstract_offline_learning 
-		return new{T}(n_steps, n_actions, n_sessions, η, decay, 
+	function delta_agent(n_steps, n_actions, n_sessions, η, decay, offline::T, policy::Y) where {T <: abstract_offline_learning,
+																								Y <: abstract_policy}
+		return new{T, Y}(n_steps, n_actions, n_sessions, η, decay, 
 						zeros(n_steps, n_sessions), 
 						zeros(n_steps, n_actions, n_sessions), 
 						zeros(n_sessions), 

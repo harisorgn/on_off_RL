@@ -5,10 +5,8 @@ function obj_func_delta(x::Vector, grad::Vector, env_v, obj_param_v, offline_lea
 
 	for env in env_v
 
-		(n_steps, n_bandits, n_sessions) = size(env.r_m)
-
-		n_bias_steps = Int(floor(0.5*env.n_steps))
-		bias_buffer_length = Int(floor(0.2*env.n_steps))
+		n_bias_steps = Int(floor(0.5*env.reward_process.n_steps))
+		bias_buffer_length = Int(floor(0.2*env.reward_process.n_steps))
 
 		η_offline = x[1]
 		decay_offline = obj_param_v[1]
@@ -18,8 +16,9 @@ function obj_func_delta(x::Vector, grad::Vector, env_v, obj_param_v, offline_lea
 
 		ε = x[3]
 
-		agent = delta_agent(n_steps, n_bandits, n_sessions, η_r, decay_r,
-							offline_learning(n_bias_steps, n_bandits, n_sessions, bias_buffer_length, η_offline, decay_offline), 
+		agent = delta_agent(env.reward_process.n_steps, env.reward_process.n_bandits, env.reward_process.n_sessions, η_r, decay_r,
+							offline_learning(n_bias_steps, env.reward_process.n_bandits, env.reward_process.n_sessions, 
+											bias_buffer_length, η_offline, decay_offline), 
 							ε_greedy_policy(ε))
 
 		run_environment!(env, agent)
@@ -37,10 +36,8 @@ function obj_func_delta_no_offline(x::Vector, grad::Vector, env_v, obj_param_v)
 
 	for env in env_v
 
-		(n_steps, n_bandits, n_sessions) = size(env.r_m)
-
-		n_bias_steps = Int(floor(0.5*env.n_steps))
-		bias_buffer_length = Int(floor(0.2*env.n_steps))
+		n_bias_steps = Int(floor(0.5*env.reward_process.n_steps))
+		bias_buffer_length = Int(floor(0.2*env.reward_process.n_steps))
 
 		η_offline = 0.0
 		decay_offline = 0.0
@@ -50,8 +47,9 @@ function obj_func_delta_no_offline(x::Vector, grad::Vector, env_v, obj_param_v)
 
 		ε = x[2]
 
-		agent = delta_agent(n_steps, n_bandits, n_sessions, η_r, decay_r,
-							offline_bias(n_bias_steps, n_bandits, n_sessions, bias_buffer_length, η_offline, decay_offline), 
+		agent = delta_agent(env.reward_process.n_steps, env.reward_process.n_bandits, env.reward_process.n_sessions, η_r, decay_r,
+							offline_bias(n_bias_steps, env.reward_process.n_bandits, env.reward_process.n_sessions, 
+										bias_buffer_length, η_offline, decay_offline), 
 							ε_greedy_policy(ε))
 
 		run_environment!(env, agent)
@@ -68,11 +66,9 @@ function obj_func_prob_delta(x::Vector, grad::Vector, env_v, obj_param_v, offlin
 	obj = 0.0
 
 	for env in env_v
-
-		(n_steps, n_bandits, n_sessions) = size(env.r_m)
 	
-		n_bias_steps = Int(floor(0.5*env.n_steps))
-		bias_buffer_length = Int(floor(0.2*env.n_steps))
+		n_bias_steps = Int(floor(0.5*env.reward_process.n_steps))
+		bias_buffer_length = Int(floor(0.2*env.reward_process.n_steps))
 
 		η_b = x[1]
 		decay_b = obj_param_v[1]
@@ -85,9 +81,10 @@ function obj_func_prob_delta(x::Vector, grad::Vector, env_v, obj_param_v, offlin
 
 		ε = x[5]
 
-		agent = probabilistic_delta_agent(n_steps, n_bandits, n_sessions, 
+		agent = probabilistic_delta_agent(env.reward_process.n_steps, env.reward_process.n_bandits, env.reward_process.n_sessions, 
 										η_r, decay_r, μ_prob_delta, σ_prob_delta, 
-										offline_learning(n_bias_steps, n_bandits, n_sessions, bias_buffer_length, η_b, decay_b), 
+										offline_learning(n_bias_steps, env.reward_process.n_bandits, env.reward_process.n_sessions, 
+														bias_buffer_length, η_b, decay_b), 
 										ε_greedy_policy(ε))
 
 		run_environment!(env, agent)
@@ -104,11 +101,9 @@ function obj_func_OU(x::Vector, grad::Vector, env_v, obj_param_v)
 	obj = 0.0
 
 	for env in env_v
-
-		(n_steps, n_bandits, n_sessions) = size(env.r_m)
 	
-		n_bias_steps = Int(floor(0.5*env.n_steps))
-		bias_buffer_length = Int(floor(0.2*env.n_steps))
+		n_bias_steps = Int(floor(0.5*env.reward_process.n_steps))
+		bias_buffer_length = Int(floor(0.2*env.reward_process.n_steps))
 
 		η_b = x[1]
 		decay_b = obj_param_v[1]
@@ -118,9 +113,10 @@ function obj_func_OU(x::Vector, grad::Vector, env_v, obj_param_v)
 
 		ε = x[3]
 
-		agent = OU_agent(n_steps, n_bandits, n_sessions, 
+		agent = OU_agent(env.reward_process.n_steps, env.reward_process.n_bandits, env.reward_process.n_sessions, 
 						η_r, decay_r, obj_param_v[3], obj_param_v[4], 
-						offline_bias(n_bias_steps, n_bandits, n_sessions, bias_buffer_length, η_b, decay_b), 
+						offline_bias(n_bias_steps, env.reward_process.n_bandits, env.reward_process.n_sessions, 
+									bias_buffer_length, η_b, decay_b), 
 						ε_greedy_policy(ε))
 
 		run_environment!(env, agent)
@@ -140,7 +136,7 @@ constraint_OU(x::Vector, grad::Vector, obj_param_v) = x[2] - 1.0/pdf(Normal((1.0
 
 function run_delta_agent_opt(env_v::Array{T,1}, obj_param_v, offline_learning) where T <: abstract_bandit_environment
 
-	# vector to be optimised = [η_b, η_r, ε]
+	# vector to be optimised = [η_offline, η_r, ε]
 
 	opt = Opt(:LN_COBYLA, 3)
 	opt.lower_bounds = [0.0, 0.0, 0.0]
@@ -176,7 +172,7 @@ end
 
 function run_delta_agent_no_offline_opt(env_v::Array{T,1}, obj_param_v) where T <: abstract_bandit_environment
 
-	# vector to be optimised = [η_b, η_r, ε]
+	# vector to be optimised = [η_r, ε]
 
 	opt = Opt(:LN_COBYLA, 2)
 	opt.lower_bounds = [0.0, 0.0]
@@ -210,7 +206,7 @@ end
 
 function run_prob_delta_agent_opt(env_v::Array{T,1}, obj_param_v, offline_learning) where T <: abstract_bandit_environment
 
-	# vector to be optimised = [η_b, η_r, μ, σ, ε]
+	# vector to be optimised = [η_offline, η_r, μ, σ, ε]
 
 	opt = Opt(:LN_COBYLA, 5)
 	opt.lower_bounds = [0.0, 0.0, -Inf, 0.0, 0.0]
@@ -252,7 +248,7 @@ end
 
 function run_OU_agent_opt(env_v::Array{T,1}, obj_param_v, offline_learning) where T <: abstract_bandit_environment
 
-	# vector to be optimised = [η_b, η_r, ε]
+	# vector to be optimised = [η_offline, η_r, ε]
 
 	opt = Opt(:LN_COBYLA, 3)
 	opt.lower_bounds = [0.0, 0.0, 0.0]

@@ -17,30 +17,25 @@ function main()
 	n_sessions = 10
 	n_bandits = 2
 
+	r_0_v = [0.0, 0.0]
 	μ_v = [0.0, 0.0]
 	σ_v = [1.0, 1.0]
 	γ_v = [0.5, 0.5]
 
-	env_v = repeat([initialise_OU_bandit_environment(n_warmup_steps, n_steps, n_bandits, n_sessions, μ_v, σ_v, γ_v),
-					initialise_OU_bandit_distribution_outlier_environment(n_warmup_steps, n_steps, n_bandits, n_sessions, μ_v, σ_v, γ_v),
-					initialise_OU_bandit_frequency_outlier_environment(n_warmup_steps, n_steps, n_bandits, n_sessions, μ_v, σ_v, γ_v),
-					initialise_OU_bandit_delay_outlier_environment(n_warmup_steps, n_steps, n_bandits, n_sessions, μ_v, σ_v, γ_v)], 
-					1)
+	env_v = [bandit_environment(OU_process(n_warmup_steps, n_steps, n_bandits, n_sessions, r_0_v, μ_v, σ_v, γ_v),
+								no_out_process(n_steps, n_bandits, n_sessions), 
+								MersenneTwister()),
+			bandit_environment(OU_process(n_warmup_steps, n_steps, n_bandits, n_sessions, r_0_v, μ_v, σ_v, γ_v),
+								initialise_distribution_out_process(n_steps, n_bandits, n_sessions), 
+								MersenneTwister()),
+			bandit_environment(OU_process(n_warmup_steps, n_steps, n_bandits, n_sessions, r_0_v, μ_v, σ_v, γ_v),
+								initialise_frequency_out_process(n_steps, n_bandits, n_sessions), 
+								MersenneTwister()),
+			bandit_environment(OU_process(n_warmup_steps, n_steps, n_bandits, n_sessions, r_0_v, μ_v, σ_v, γ_v),
+								initialise_delay_out_process(n_steps, n_bandits, n_sessions), 
+								MersenneTwister())]
 
 	run_opt(env_v)	
-	
-	#=
-	file_name = "opt_res_3879.jld"
-
-	env_v = load(file_name, "env_v")
-	d_agent_bias = load(file_name, "d_agent_bias")
-	d_agent_Q = load(file_name, "d_agent_Q")
-	d_agent_no_offline = load(file_name, "d_agent_no_offline")
-
-	println("γ = ", env_v[1].γ_v[1])
-
-	plot_performance(env_v, [d_agent_bias, d_agent_Q, d_agent_no_offline]; n_runs = 100)
-	=#
 	
 end
 

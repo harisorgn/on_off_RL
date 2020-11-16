@@ -39,7 +39,7 @@ function plot_bandit_results(env::abstract_bandit_environment, agent::abstract_b
 				append!(plotted_label_v, bandit)
 			end
 
-			ax[2].plot(x_range_r, env.r_m[:, bandit, session] .+ env.r_outlier_m[:, bandit, session], color = r_colour_v[bandit])
+			ax[2].plot(x_range_r, env.reward_process.r_m[:, bandit, session] .+ env.out_process.r_m[:, bandit, session], color = r_colour_v[bandit])
 
 			idx_v = findall(x -> x == bandit, agent.action_m[:, session])
 
