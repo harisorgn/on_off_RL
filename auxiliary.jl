@@ -25,43 +25,46 @@ function initialise_OU_process(n_warmup_steps, n_steps, n_bandits, n_sessions, �
 	return OU_process(n_warmup_steps, n_steps, n_bandits, n_sessions, r_0_v, γ_v, μ_v, σ_v)
 end
 
-function initialise_distribution_out_process(n_steps, n_bandits, n_sessions)
+function initialise_distribution_out_process(n_steps, n_bandits, n_sessions, r_out)
 
-	outlier1_distr = MixtureModel(Normal, [(0.0, 0.01), (10.0, 0.1), (-10.0, 0.1)], 
-								  [0.8, 		0.15, 		0.05])
+	outlier1_distr = MixtureModel(Normal, [(0.0, 0.01), (r_out, 0.1), (-r_out, 0.1)], 
+								  			[0.8, 		0.15, 		0.05])
 
-	outlier2_distr = MixtureModel(Normal, [(0.0, 0.01), (10.0, 0.1), (-10.0, 0.1)], 
-								  [0.9, 		0.05, 		0.05])
+	outlier2_distr = MixtureModel(Normal, [(0.0, 0.01), (r_out, 0.1), (-r_out, 0.1)], 
+								  			[0.9, 		0.05, 		0.05])
 
 	return distribution_out_process(n_steps, n_bandits, n_sessions, [outlier1_distr, outlier2_distr])
 end
 
-function initialise_frequency_out_process(n_steps, n_bandits, n_sessions)
+function initialise_frequency_out_process(n_steps, n_bandits, n_sessions, r_out)
 	
-	r_out = 10.0 
+	out_bandit = 1
 	p_out_max = 0.2 
 	η_p_out = 0.05 
 	decay_p_out = 0.1
 
-	return frequency_out_process(n_steps, n_bandits, n_sessions, r_out, p_out_max, η_p_out, decay_p_out)
+	return frequency_out_process(n_steps, n_bandits, n_sessions, out_bandit, r_out, p_out_max, η_p_out, decay_p_out)
 end
 
-function initialise_delay_out_process(n_steps, n_bandits, n_sessions)
+function initialise_delay_out_process(n_steps, n_bandits, n_sessions, r_out)
 
-	r_out = 10.0 
+	out_bandit = 1
 	out_delay_distr = Geometric(0.02)
 
-	return delay_out_process(n_steps, n_bandits, n_sessions, r_out, out_delay_distr)
+	return delay_out_process(n_steps, n_bandits, n_sessions, out_bandit, r_out, out_delay_distr)
 end
 
-function initialise_test_out_process(n_steps, n_bandits, n_sessions)
-
-	r_out = 10.0 
-
-	return test_out_process(n_steps, n_bandits, n_sessions, r_out)
-end
+initialise_test_out_process(n_steps, n_bandits, n_sessions, out_bandit, r_out) = test_out_process(n_steps, n_bandits, n_sessions, out_bandit, r_out)
 
 function run_bandit_example(env::abstract_bandit_environment, agent_v::Array{T, 1}; plot_flag = false) where T <:abstract_bandit_agent
+
+	random_agent = delta_agent(env.reward_process.n_steps, env.reward_process.n_bandits, env.reward_process.n_sessions, 
+							0.0, 0.0, 
+							offline_bias(env.reward_process.n_steps, env.reward_process.n_bandits, env.reward_process.n_sessions, 
+										env.reward_process.n_steps, 0.0, 0.0), 
+							ε_greedy_policy(1.0))
+
+	run_environment!(env, random_agent)
 
 	score_v = zeros(length(agent_v))
 
@@ -70,7 +73,7 @@ function run_bandit_example(env::abstract_bandit_environment, agent_v::Array{T, 
 	
 		run_environment!(env, agent)
 
-		score_v[c] = sum(agent.accumulated_r_v)
+		score_v[c] = sum(agent.accumulated_r_v) - sum(random_agent.accumulated_r_v)
 
 		if plot_flag
 
@@ -90,20 +93,28 @@ function run_opt(env_v::Array{T,1}) where T <: abstract_bandit_environment
 	#___objective function patameter vector = [decay_offline, decay_reward, γ_ΟU, σ_OU]___
 	obj_param_v = [0.01, 0.01, env_v[1].reward_process.γ_v[1], env_v[1].reward_process.σ_v[1]]
 
-	bias_v = run_delta_agent_opt(env_v, obj_param_v, offline_bias)
- 	
-	bias_d = Dict("η_offline" => bias_v[1], "η_r" => bias_v[2], "ε" => bias_v[3])
+	bias_v = run_delta_agent_opt(env_v, obj_param_v, offline_bias, ε_greedy_policy)
 
-	Q_v = run_delta_agent_opt(env_v, obj_param_v, offline_Q)
+	Q_v = run_delta_agent_opt(env_v, obj_param_v, offline_Q, ε_greedy_policy)
 
-	Q_d = Dict("η_offline" => Q_v[1], "η_r" => Q_v[2], "ε" => Q_v[3])
+	no_offline_v = run_delta_agent_no_offline_opt(env_v, obj_param_v, ε_greedy_policy)
 
-	no_offline_v = run_delta_agent_no_offline_opt(env_v, obj_param_v)
 
-	no_offline_d = Dict("η_r" => no_offline_v[1], "ε" => no_offline_v[2])
+	bias_agent = delta_agent(0, 0, 0, bias_v[2], obj_param_v[2], 
+								offline_bias(0, 0, 0, 0, bias_v[1], obj_param_v[1]),
+								ε_greedy_policy(bias_v[3]))
 
+	Q_agent = delta_agent(0, 0, 0, Q_v[2], obj_param_v[2], 
+							offline_Q(0, 0, 0, 0, Q_v[1], obj_param_v[1]),
+							ε_greedy_policy(Q_v[3]))
+
+	no_offline_agent = delta_agent(0, 0, 0, no_offline_v[1], obj_param_v[2], 
+									offline_bias(0, 0, 0, 0, 0.0, obj_param_v[1]),
+									ε_greedy_policy(no_offline_v[2]))
+
+	
 	save(string("opt_res_", rand(MersenneTwister(), 1000:9999), ".jld"), 
-		"env_v", env_v, "bias_d", bias_d, "Q_d", Q_d, "no_offline_d", no_offline_d)
+		"env_v", env_v, "bias_agent", bias_agent, "Q_agent", Q_agent, "no_offline_agent", no_offline_agent)
 
 end
 

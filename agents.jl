@@ -264,33 +264,33 @@ function (agent::delta_agent{offline_Q})(r_environment, cstep, session, availabl
 	return agent.action_m[cstep, session]
 end
 
+
 initialise_new_instance(agent::delta_agent{offline_bias}, n_steps, n_actions, n_sessions) = delta_agent(n_steps, 
+																						n_actions, 
+																						n_sessions, 
+																						agent.η, 
+																						agent.decay, 
+																						offline_bias(Int(floor(0.5*n_steps)), 
 																									n_actions, 
 																									n_sessions, 
-																									agent.η, 
-																									agent.decay, 
-																									offline_bias(n_steps, 
-																												n_actions, 
-																												n_sessions, 
-																												agent.offline.buffer_length, 
-																												agent.offline.η, 
-																												agent.offline.decay), 
-																									agent.policy)
+																									Int(floor(0.2*n_steps)), 
+																									agent.offline.η, 
+																									agent.offline.decay), 
+																						agent.policy)
 
 initialise_new_instance(agent::delta_agent{offline_Q}, n_steps, n_actions, n_sessions) = delta_agent(n_steps, 
-																									n_actions, 
-																									n_sessions, 
-																									agent.η, 
-																									agent.decay, 
-																									offline_Q(n_steps, 
-																											n_actions, 
-																											n_sessions, 
-																											agent.offline.buffer_length, 
-																											agent.offline.η, 
-																											agent.offline.decay), 
-																									agent.policy)
+																						n_actions, 
+																						n_sessions, 
+																						agent.η, 
+																						agent.decay, 
+																						offline_Q(Int(floor(0.5*n_steps)), 
+																								n_actions, 
+																								n_sessions, 
+																								Int(floor(0.2*n_steps)), 
+																								agent.offline.η, 
+																								agent.offline.decay), 
+																						agent.policy)
 
-																									
 #----------------------------------------------------------------------------------------------------------------------------------
 #--------------------------Under development---------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------------------------------------------

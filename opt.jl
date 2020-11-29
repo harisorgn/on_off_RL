@@ -1,5 +1,5 @@
 
-function obj_func_delta(x::Vector, grad::Vector, env_v, obj_param_v, offline_learning)
+function obj_func_delta(x::Vector, grad::Vector, env_v, obj_param_v, offline_learning, policy)
 
 	obj = 0.0
 
@@ -19,7 +19,7 @@ function obj_func_delta(x::Vector, grad::Vector, env_v, obj_param_v, offline_lea
 		agent = delta_agent(env.reward_process.n_steps, env.reward_process.n_bandits, env.reward_process.n_sessions, η_r, decay_r,
 							offline_learning(n_bias_steps, env.reward_process.n_bandits, env.reward_process.n_sessions, 
 											bias_buffer_length, η_offline, decay_offline), 
-							ε_greedy_policy(ε))
+							policy(ε))
 
 		run_environment!(env, agent)
 
@@ -30,7 +30,7 @@ function obj_func_delta(x::Vector, grad::Vector, env_v, obj_param_v, offline_lea
 	return obj
 end
 
-function obj_func_delta_no_offline(x::Vector, grad::Vector, env_v, obj_param_v)
+function obj_func_delta_no_offline(x::Vector, grad::Vector, env_v, obj_param_v, policy)
 
 	obj = 0.0
 
@@ -50,7 +50,7 @@ function obj_func_delta_no_offline(x::Vector, grad::Vector, env_v, obj_param_v)
 		agent = delta_agent(env.reward_process.n_steps, env.reward_process.n_bandits, env.reward_process.n_sessions, η_r, decay_r,
 							offline_bias(n_bias_steps, env.reward_process.n_bandits, env.reward_process.n_sessions, 
 										bias_buffer_length, η_offline, decay_offline), 
-							ε_greedy_policy(ε))
+							policy(ε))
 
 		run_environment!(env, agent)
 
@@ -61,7 +61,7 @@ function obj_func_delta_no_offline(x::Vector, grad::Vector, env_v, obj_param_v)
 	return obj
 end
 
-function obj_func_prob_delta(x::Vector, grad::Vector, env_v, obj_param_v, offline_learning)
+function obj_func_prob_delta(x::Vector, grad::Vector, env_v, obj_param_v, offline_learning, policy)
 	
 	obj = 0.0
 
@@ -85,7 +85,7 @@ function obj_func_prob_delta(x::Vector, grad::Vector, env_v, obj_param_v, offlin
 										η_r, decay_r, μ_prob_delta, σ_prob_delta, 
 										offline_learning(n_bias_steps, env.reward_process.n_bandits, env.reward_process.n_sessions, 
 														bias_buffer_length, η_b, decay_b), 
-										ε_greedy_policy(ε))
+										policy(ε))
 
 		run_environment!(env, agent)
 
@@ -96,7 +96,7 @@ function obj_func_prob_delta(x::Vector, grad::Vector, env_v, obj_param_v, offlin
 	return obj
 end
 
-function obj_func_OU(x::Vector, grad::Vector, env_v, obj_param_v)
+function obj_func_OU(x::Vector, grad::Vector, env_v, obj_param_v, offline_learning, policy)
 	
 	obj = 0.0
 
@@ -115,9 +115,9 @@ function obj_func_OU(x::Vector, grad::Vector, env_v, obj_param_v)
 
 		agent = OU_agent(env.reward_process.n_steps, env.reward_process.n_bandits, env.reward_process.n_sessions, 
 						η_r, decay_r, obj_param_v[3], obj_param_v[4], 
-						offline_bias(n_bias_steps, env.reward_process.n_bandits, env.reward_process.n_sessions, 
-									bias_buffer_length, η_b, decay_b), 
-						ε_greedy_policy(ε))
+						offline_learning(n_bias_steps, env.reward_process.n_bandits, env.reward_process.n_sessions, 
+										bias_buffer_length, η_b, decay_b), 
+						policy(ε))
 
 		run_environment!(env, agent)
 
@@ -134,7 +134,7 @@ constraint_prob_delta(x::Vector, grad::Vector) = x[2] - 1.0/pdf(Normal(x[3], x[4
 constraint_OU(x::Vector, grad::Vector, obj_param_v) = x[2] - 1.0/pdf(Normal((1.0 - obj_param_v[3]) * 0.0, obj_param_v[4]), 
 																			(1.0 - obj_param_v[3]) * 0.0)
 
-function run_delta_agent_opt(env_v::Array{T,1}, obj_param_v, offline_learning) where T <: abstract_bandit_environment
+function run_delta_agent_opt(env_v::Array{T,1}, obj_param_v, offline_learning, policy) where T <: abstract_bandit_environment
 
 	# vector to be optimised = [η_offline, η_r, ε]
 
@@ -146,14 +146,14 @@ function run_delta_agent_opt(env_v::Array{T,1}, obj_param_v, offline_learning) w
 	opt.xtol_rel = 1e-16
 	opt.xtol_abs = 1e-16
 
-	opt.max_objective = (x, g) -> obj_func_delta(x, g, env_v, obj_param_v, offline_learning)
+	opt.max_objective = (x, g) -> obj_func_delta(x, g, env_v, obj_param_v, offline_learning, policy)
 
 	max_opt = -999.0
 	max_x_v = zeros(length(opt.lower_bounds))
 
 	for η_offline_0 in 0.01:0.3:1.0
 		for η_r_0 in 0.1:0.3:1.0
-			for ε_0 in 0.0:0.3:1.0
+			for ε_0 in 0.1:0.3:1.0
 
 				(max_f, max_x, ret) = optimize(opt, [η_offline_0, η_r_0, ε_0])
 
@@ -170,7 +170,7 @@ function run_delta_agent_opt(env_v::Array{T,1}, obj_param_v, offline_learning) w
 	return max_x_v
 end
 
-function run_delta_agent_no_offline_opt(env_v::Array{T,1}, obj_param_v) where T <: abstract_bandit_environment
+function run_delta_agent_no_offline_opt(env_v::Array{T,1}, obj_param_v, policy) where T <: abstract_bandit_environment
 
 	# vector to be optimised = [η_r, ε]
 
@@ -182,13 +182,13 @@ function run_delta_agent_no_offline_opt(env_v::Array{T,1}, obj_param_v) where T 
 	opt.xtol_rel = 1e-16
 	opt.xtol_abs = 1e-16
 
-	opt.max_objective = (x, g) -> obj_func_delta_no_offline(x, g, env_v, obj_param_v)
+	opt.max_objective = (x, g) -> obj_func_delta_no_offline(x, g, env_v, obj_param_v, policy)
 
 	max_opt = -999.0
 	max_x_v = zeros(length(opt.lower_bounds))
 
 	for η_r_0 in 0.1:0.3:1.0
-		for ε_0 in 0.0:0.3:1.0
+		for ε_0 in 0.1:0.3:1.0
 
 			(max_f, max_x, ret) = optimize(opt, [η_r_0, ε_0])
 
@@ -204,7 +204,7 @@ function run_delta_agent_no_offline_opt(env_v::Array{T,1}, obj_param_v) where T 
 	return max_x_v
 end
 
-function run_prob_delta_agent_opt(env_v::Array{T,1}, obj_param_v, offline_learning) where T <: abstract_bandit_environment
+function run_prob_delta_agent_opt(env_v::Array{T,1}, obj_param_v, offline_learning, policy) where T <: abstract_bandit_environment
 
 	# vector to be optimised = [η_offline, η_r, μ, σ, ε]
 
@@ -216,7 +216,7 @@ function run_prob_delta_agent_opt(env_v::Array{T,1}, obj_param_v, offline_learni
 	opt.xtol_rel = 1e-16
 	opt.xtol_abs = 1e-16
 
-	opt.max_objective = (x, g) -> obj_func_prob_delta(x, g, env_v, obj_param_v, offline_learning)
+	opt.max_objective = (x, g) -> obj_func_prob_delta(x, g, env_v, obj_param_v, offline_learning, policy)
 
 	inequality_constraint!(opt, constraint_prob_delta, 1e-8)
 
@@ -246,7 +246,7 @@ function run_prob_delta_agent_opt(env_v::Array{T,1}, obj_param_v, offline_learni
 	return max_x_v
 end
 
-function run_OU_agent_opt(env_v::Array{T,1}, obj_param_v, offline_learning) where T <: abstract_bandit_environment
+function run_OU_agent_opt(env_v::Array{T,1}, obj_param_v, offline_learning, policy) where T <: abstract_bandit_environment
 
 	# vector to be optimised = [η_offline, η_r, ε]
 
@@ -258,7 +258,7 @@ function run_OU_agent_opt(env_v::Array{T,1}, obj_param_v, offline_learning) wher
 	opt.xtol_rel = 1e-16
 	opt.xtol_abs = 1e-16
 
-	opt.max_objective = (x, g) -> obj_func_OU(x, g, env_v, obj_param_v, offline_learning)
+	opt.max_objective = (x, g) -> obj_func_OU(x, g, env_v, obj_param_v, offline_learning, policy)
 
 	inequality_constraint!(opt, (x, g) -> constraint_OU(x, g, obj_param_v), 1e-8)
 
