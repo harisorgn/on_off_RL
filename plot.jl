@@ -79,7 +79,7 @@ function plot_performance(file_v::Array{String, 1}; n_runs = 100)
 
 		d = load(file)
 
-		env_v = d["env_v"]
+		env_v = d["env_v"][1:2]
 
 		agent_v = [d[agent_key] for agent_key in agent_keys_v]
 
@@ -122,7 +122,7 @@ function plot_performance_split(file_v::Array{String, 1}; n_runs = 100)
 
 		d = load(file)
 
-		env_v = d["env_v"]
+		env_v = d["env_v"][1:4]
 
 		agent_v = [d[agent_key] for agent_key in agent_keys_v]
 

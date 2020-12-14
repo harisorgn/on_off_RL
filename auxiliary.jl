@@ -49,7 +49,7 @@ end
 function initialise_delay_out_process(n_steps, n_bandits, n_sessions, r_out)
 
 	out_bandit = 1
-	out_delay_distr = Geometric(0.02)
+	out_delay_distr = Geometric(0.1)
 
 	return delay_out_process(n_steps, n_bandits, n_sessions, out_bandit, r_out, out_delay_distr)
 end

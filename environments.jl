@@ -167,8 +167,8 @@ struct delay_out_process <: abstract_out_process
 	delay_distr::Distribution
 	r_m::Array{Float64}					# steps x bandits x sessions
 
-	delay_out_process(n_steps, n_bandits, n_sessions, out_bandit, r, delay_distr) = new(n_steps, 
-																						out_bandit, 
+	delay_out_process(n_steps, n_bandits, n_sessions, out_bandit, r, delay_distr) = new(out_bandit,
+																						n_steps,  
 																						r, 
 																						delay_distr, 
 																						zeros(n_steps, n_bandits, n_sessions))
@@ -176,6 +176,7 @@ end
 
 function update_out_process!(process::delay_out_process, action, cstep, session, rng)
 	
+
 	if action == process.out_bandit
 
 		delayed_step = rand(rng, process.delay_distr) + 1 	# when env.outlier_delay_distr is Geometric 
@@ -185,6 +186,7 @@ function update_out_process!(process::delay_out_process, action, cstep, session,
 		if cstep + delayed_step <= process.n_steps
 
 			process.r_m[cstep + delayed_step, :, session] .= process.r
+
 		end
 	end	
 end

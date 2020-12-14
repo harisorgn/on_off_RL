@@ -212,17 +212,17 @@ function (agent::delta_agent{offline_bias})(r_environment, cstep, session, avail
 
 		agent.r_m[cstep, latest_action, session] = agent.r_m[cstep - 1, latest_action, session] + agent.η * δr
 
-		agent.r_m[cstep, setdiff(1:agent.n_actions, latest_action), session] .= (1.0 - agent.decay) * 
+		agent.r_m[cstep, setdiff(1:agent.n_actions, latest_action), session] = (1.0 - agent.decay) * 
 																agent.r_m[cstep - 1, setdiff(1:agent.n_actions, latest_action), session]
 
-		agent.action_m[cstep, session] = available_action_v[agent.policy(agent.r_m[cstep, available_action_v, session] .+ 
+		agent.action_m[cstep, session] = available_action_v[agent.policy(agent.r_m[cstep, available_action_v, session] + 
 																		agent.offline.r_m[1, available_action_v, session])]
 
 	elseif cstep == 1
 
 		agent.r_m[cstep, :, session] = (session == 1) ? zeros(agent.n_actions) : agent.r_m[end, :, session - 1]
 
-		agent.action_m[cstep, session] = available_action_v[agent.policy(agent.r_m[cstep, available_action_v, session] .+ 
+		agent.action_m[cstep, session] = available_action_v[agent.policy(agent.r_m[cstep, available_action_v, session] + 
 																		agent.offline.r_m[1, available_action_v, session])]
 
 	end
@@ -246,7 +246,7 @@ function (agent::delta_agent{offline_Q})(r_environment, cstep, session, availabl
 
 		agent.r_m[cstep, latest_action, session] = agent.r_m[cstep - 1, latest_action, session] + agent.η * δr
 
-		agent.r_m[cstep, setdiff(1:agent.n_actions, latest_action), session] .= (1.0 - agent.decay) * 
+		agent.r_m[cstep, setdiff(1:agent.n_actions, latest_action), session] = (1.0 - agent.decay) * 
 																agent.r_m[cstep - 1, setdiff(1:agent.n_actions, latest_action), session]
 
 		agent.action_m[cstep, session] = available_action_v[agent.policy(agent.r_m[cstep, available_action_v, session])]
